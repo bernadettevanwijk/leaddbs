@@ -57,13 +57,13 @@ handles.output = hObject;
 
 % Update handles structure
 guidata(hObject, handles);
-try 
+ try
     ea_compat_data; 
-end
-
+ end
 earoot=ea_getearoot;
 
 ea_setpath;
+ea_checkbuildspace;
 
 ea_checkspm;
 
@@ -126,7 +126,6 @@ axis equal;
 ea_setbuttonbackdrop(handles.startdbs,[earoot,'icons',filesep,'logo_lead_dbs_small.png']);
 ea_setbuttonbackdrop(handles.startconnectome,[earoot,'icons',filesep,'logo_lead_connectome_small.png']);
 ea_setbuttonbackdrop(handles.startgroup,[earoot,'icons',filesep,'logo_lead_group_small.png']);
-ea_setbuttonbackdrop(handles.startmacaque,[earoot,'icons',filesep,'logo_lead_dbs_macaque_small.png']);
 ea_setbuttonbackdrop(handles.startanatomy,[earoot,'icons',filesep,'logo_lead_anatomy_small.png']);
 set(handles.versiontxt,'String',['v',ea_getvsn('local')]);
 
