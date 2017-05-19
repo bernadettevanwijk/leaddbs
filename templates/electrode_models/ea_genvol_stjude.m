@@ -19,7 +19,7 @@ seeds=[];
 
 for i=1:length(meshel.ins)
     fcyl=[fcyl; meshel.ins{i}.faces+size(ncyl,1)];
-    
+
         scyl=[scyl; meshel.ins{i}.endplates+size(ncyl,1)]; % had to rebuild the endplates
     ncyl=[ncyl; meshel.ins{i}.vertices];
     seeds=[seeds; mean(meshel.ins{i}.vertices)];

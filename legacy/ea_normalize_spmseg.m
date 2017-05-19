@@ -50,7 +50,7 @@ end
 % First, do the coreg part:
 if options.modality==1
     try
-        ea_coregmr(options,options.prefs.normalize.coreg);
+        ea_coregmr(options);
     end
 end
 
@@ -157,7 +157,7 @@ for export=expdo
     end
 
 
-    matlabbatch{1}.spm.util.imcalc.input = {[options.earoot,'templates',filesep,'bb.nii,1'];
+    matlabbatch{1}.spm.util.imcalc.input = {[ea_space,'bb.nii,1'];
         fina
         };
     matlabbatch{1}.spm.util.imcalc.output = outf;

@@ -1,4 +1,4 @@
-function atlases=ea_showatlas(varargin)
+function [atlases,colorbuttons,atlassurfs]=ea_showatlas(varargin)
 % This function shows atlas data in the 3D-Scene viewer. It
 % reads in all atlases found in the eAuto_root/atlases folder, calculates a
 % convex hull around the nonzero area and renders this area as 3D surfaces.
@@ -48,10 +48,10 @@ for nativemni=nm % switch between native and mni space atlases.
     
     if ~exist([adir,'atlas_index.mat'],'file')
         
-        atlases=ea_genatlastable([],fileparts(adir(1:end-1)),options,mifix);
+        atlases=ea_genatlastable([],fileparts(fileparts(adir)),options,mifix);
     else
         load([adir,'atlas_index.mat']);
-        atlases=ea_genatlastable(atlases,fileparts(adir(1:end-1)),options,mifix);
+        atlases=ea_genatlastable(atlases,fileparts(adir),options,mifix);
     end
     
     
@@ -94,8 +94,14 @@ for nativemni=nm % switch between native and mni space atlases.
     
     setinterpol=1;
     
-    ht=uitoolbar(resultfig);
-    
+   ht=getappdata(resultfig,'atlht');
+   if ~isempty(ht) % sweep nonempty atlases toolbar
+       delete(ht.Children(:));
+   else
+       ht=uitoolbar(resultfig);
+   end
+    atlcntbutton=uipushtool(ht,'CData',ea_get_icn('atlases',options),'TooltipString','Atlas Control Figure','ClickedCallback',{@ea_openatlascontrol,atlases,resultfig,options});
+
     % prepare stats fields
     if options.writeoutstats
         
@@ -114,8 +120,7 @@ for nativemni=nm % switch between native and mni space atlases.
     % iterate through atlases, visualize them and write out stats.
     for atlas=1:length(atlases.names)
         
-        
-        
+        [~,sidestr]=detsides(atlases.types(atlas));
         for side=detsides(atlases.types(atlas));
             
 %             if ischar(atlases.pixdim{atlas,side}) % we are dealing with fibers
@@ -133,11 +138,12 @@ for nativemni=nm % switch between native and mni space atlases.
                 fv=atlases.fv{atlas,side};
                 
                 
-                if ischar(options.prefs.hullsimplify)
-                    
+                if ischar(options.prefs.hullsimplify)   % for 'auto' hullsimplify
                     % get to 700 faces
                     simplify=700/length(fv.faces);
-                    fv=reducepatch(fv,simplify);
+                    if simplify < 1 % skip volumes with fewer than 700 faces
+                        fv=reducepatch(fv,simplify);
+                    end
                     
                 else
                     if options.prefs.hullsimplify<1 && options.prefs.hullsimplify>0
@@ -189,7 +195,6 @@ for nativemni=nm % switch between native and mni space atlases.
                     try
                     [~,centroid]=kmeans(XYZ.mm(:,1:3),1);
                     catch
-                        keyboard
                         centroid=mean(XYZ(:,1:3),1);
                     end
                 else
@@ -223,8 +228,9 @@ for nativemni=nm % switch between native and mni space atlases.
                     [~,thislabel]=fileparts(thislabel);
                 end
             end
-            atlaslabels(atlas,side)=text(centroid(1),centroid(2),centroid(3),ea_sub2space(thislabel),'VerticalAlignment','Baseline','HorizontalAlignment','Center');
-
+            atlaslabels(atlas,side)=text(centroid(1),centroid(2),centroid(3),ea_sub2space(thislabel),'VerticalAlignment','Baseline','HorizontalAlignment','Center','Color','w');
+            
+           
             if ~exist('labelbutton','var')
                 labelbutton=uitoggletool(ht,'CData',ea_get_icn('labels',options),'TooltipString','Labels');
                 labelcolorbutton=uipushtool(ht,'CData',ea_get_icn('colors',options),'TooltipString','Label Color');
@@ -240,10 +246,15 @@ for nativemni=nm % switch between native and mni space atlases.
             try
                 atlasc=squeeze(jetlist(ceil(atlases.colors(atlas)),:));  % color for toggle button icon
             catch
-                keyboard
+                ea_error('Atlas color not found.');
             end
 
-            colorbuttons(atlascnt)=uitoggletool(ht,'CData',ea_get_icn('atlas',atlasc),'TooltipString',atlases.names{atlas},'OnCallback',{@atlasvisible,atlascnt,'on'},'OffCallback',{@atlasvisible,atlascnt,'off'},'State','on');
+            colorbuttons(atlascnt)=uitoggletool(ht,'CData',ea_get_icn('atlas',atlasc),'TooltipString',atlases.names{atlas},'ClickedCallback',{@atlasvisible,resultfig,atlascnt},'State','on');
+            
+            % set Tags
+            set(colorbuttons(atlascnt),'tag',[thislabel,'_',sidestr{side}])
+            set(atlassurfs(atlascnt,1),'tag',[thislabel,'_',sidestr{side}])
+            set(atlassurfs(atlascnt,1),'UserData',atlaslabels(atlas,side))
             
             % gather contact statistics
             if options.writeoutstats
@@ -289,10 +300,12 @@ for nativemni=nm % switch between native and mni space atlases.
             
             set(gcf,'Renderer','OpenGL')
             axis off
-            set(gcf,'color','w');
+            % set(gcf,'color','w');
             axis equal
             
-            drawnow
+            if rand(1)>0.8 % we don't want to show every buildup step due to speed but want to show some buildup.
+                drawnow
+            end
             
             
         end
@@ -300,7 +313,7 @@ for nativemni=nm % switch between native and mni space atlases.
     
     setappdata(resultfig,'atlassurfs',atlassurfs);
     setappdata(resultfig,'colorbuttons',colorbuttons);
-    
+    setappdata(resultfig,'atlht',ht);
     % configure label button to work properly and hide labels as default.
     
     atlabelsvisible([],[],atlaslabels(:),'off');
@@ -351,6 +364,10 @@ for nativemni=nm % switch between native and mni space atlases.
 end
 
 
+% open up atlas control viewer
+
+
+
 
 function setlabelcolor(hobj,ev,robject)
 
@@ -366,12 +383,16 @@ C = rem(floor((strfind('kbgcrmyw', C) - 1) * [0.25 0.5 1]), 2);
 
 
 
-function atlasvisible(hobj,ev,atlscnt,onoff)
-atls=getappdata(gcf,'atlassurfs');
+function atlasvisible(hobj,ev,resultfig,atlscnt,onoff)
+if ~exist('onoff','var')
+    onoff=hobj.State;
+end
 
-if(getappdata(gcf,'altpressed'))
+atls=getappdata(resultfig,'atlassurfs');
+
+if(getappdata(resultfig,'altpressed'))
     
-    cbutn=getappdata(gcf,'colorbuttons');
+    cbutn=getappdata(resultfig,'colorbuttons');
     set(cbutn,'State',onoff);
     for el=1:length(atls)
         for side=1:2
@@ -392,6 +413,26 @@ else
     end
 end
 
+
+
+% check if new atlas select window is open:
+figHandles = findobj('Type','figure');
+atlspres=0;
+for f=1:length(figHandles)
+    if strcmp(figHandles(f).Tag,'atlasselect')
+        atlspres=1;
+        break
+    end
+end
+if atlspres
+   atfig=figHandles(f);
+   clear figHandles
+    handles=getappdata(atfig,'handles');
+    ea_synctree(handles)
+end
+
+
+
 function atlabelsvisible(hobj,ev,obj,onoff)
 for el=1:numel(obj)
     try
@@ -407,19 +448,24 @@ function atlasinvisible(hobj,ev,atls)
 set(atls, 'Visible', 'off');
 %disp([atls,'invisible clicked']);
 
-function sides=detsides(opt)
+function [sides,sidestr]=detsides(opt)
 
 switch opt
-    case 1 % left hemispheric atlas
+    case 1 % right hemispheric atlas
         sides=1;
-    case 2 % right hemispheric atlas
+        sidestr={'right'};
+    case 2 % left hemispheric atlas
         sides=2;
+        sidestr={[''],'left'};
     case 3
         sides=1:2;
+        sidestr={'right','left'};
     case 4
         sides=1:2;
+        sidestr={'right','left'};
     case 5
         sides=1; % midline
+        sidestr={'midline'};
         
 end
 

@@ -22,11 +22,24 @@ end
 if nargin >= 6
     transformfile = varargin{6};
 else
-    transformfile = '';
+    transformfile = ''; % use defaults
 end
 
 if nargin >= 7
     interp = varargin{7};
+    if ~ischar(interp)
+        switch interp
+            case 0
+                interp='NearestNeighbor';
+            case 1
+                interp='Linear';
+            case -1
+                interp='GenericLabel';
+            otherwise
+                interp='BSpline';
+                
+        end
+    end
 else
     % Linear, NearestNeighbor, MultiLabel, Gaussian, BSpline
     % CosineWindowedSinc, WelchWindowedSinc, HammingWindowedSinc, LanczosWindowedSinc
@@ -87,7 +100,7 @@ if nargin == 1
                 lfis{3} = ea_niigz([directory,'l',options.prefs.fa2anat]);
             end
     end
-    
+
             [fis,ofis] = ea_appendgrid(options,fis,ofis,1);
 end
 
@@ -125,11 +138,12 @@ for fi = 1:length(fis)
         else
             cmd = [cmd, ...
                    ' --reference-image ',ea_path_helper(refim),...
-                   ' --transform [',ea_path_helper(transformfile),',0]'];         
+                   ' --transform [',ea_path_helper(transformfile),',0]'];
         end
     else
         if isempty(refim)
-            refim = [options.earoot,'templates',filesep,'mni_hires_t2.nii'];
+            spacedef=ea_getspacedef;
+            refim = [ea_space,spacedef.templates{1},'.nii'];
         end
 
         if isempty(transformfile)
@@ -142,11 +156,10 @@ for fi = 1:length(fis)
                    ' --transform [',ea_path_helper(transformfile),',0]'];
         end
     end
-    
+
     if ~isempty(interp)
         cmd = [cmd, ' --interpolation ', interp];
     end
-
     if ~ispc
         system(['bash -c "', cmd, '"']);
     else

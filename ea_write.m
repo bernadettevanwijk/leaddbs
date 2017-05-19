@@ -1,5 +1,11 @@
 function ea_write(options)
 
+
+if options.scrf
+       ea_subcorticalrefine(options); 
+end
+
+
 try
     ea_updatemodel(options);
 end
@@ -40,9 +46,9 @@ if options.d3.write
     resultfig=ea_elvis(options);
     
     % save scene as matlab figure
-    try % if path is not defined, don't save.
-        saveas(resultfig,[options.root,options.patientname,filesep,'LEAD_scene.fig']);
-    end
+%     try % if path is not defined, don't save.
+%         savefig(resultfig,[options.root,options.patientname,filesep,'LEAD_scene.fig'],'compact');
+%     end
     %figure2xhtml([options.root,options.patientname,filesep,'eAuto_scene'],resultfig);
     if options.d3.autoserver
        ea_export_server([],[],options);
@@ -76,7 +82,8 @@ try
     results.fit=ea_nanmean(results.distances);
     
 end
-
+% chirp on completed task.
+ea_chirp(options);
 
 function y = ea_nanmean(varargin)
 if nargin==2

@@ -32,8 +32,6 @@ if cfg.mapmethod
     end
 end
 
-leaddir=ea_getearoot;
-
 if nargin>5
     automan=varargin{6};
 else
@@ -51,47 +49,44 @@ for pt=1:length(uidir)
     directory=[uidir{pt},filesep];
 
 
-if nargin>2
-    whichnormmethod=varargin{3};
-    template=varargin{4};
-else
-    [whichnormmethod,template]=ea_whichnormmethod(directory);
-end
+    if nargin>2
+        whichnormmethod=varargin{3};
+        template=varargin{4};
+    else
+        [whichnormmethod,template]=ea_whichnormmethod(directory);
+    end
 
     fidpoints_vox=ea_getfidpoints(fidpoints_mm,template);
 
-    [~,ptname]=fileparts(uidir{pt});
-    options.prefs=ea_prefs(ptname);
+    [options.root,options.patientname]=fileparts(uidir{pt});
+    options.root=[options.root,filesep];
+    options.prefs=ea_prefs(options.patientname);
+    options=ea_assignpretra(options);
 
     switch automan
         case 'auto' % auto AC/PC detection
-            
+
             % warp into patient space:
-            
+
             %     try
             [fpinsub_mm] = ea_map_coords(fidpoints_vox', template, [directory,'y_ea_normparams.nii'], [directory,options.prefs.prenii_unnormalized],whichnormmethod);
             %     catch
             %         ea_error(['Please check deformation field in ',directory,'.']);
             %     end
-            
+
             fpinsub_mm=fpinsub_mm';
-            
-try            
-            fid(pt).AC=fpinsub_mm(1,:);
-catch
-    keyboard
-end
+
+            try
+                fid(pt).AC=fpinsub_mm(1,:);
+            catch
+                keyboard
+            end
             fid(pt).PC=fpinsub_mm(2,:);
             fid(pt).MSP=fpinsub_mm(3,:);
         case {'manual'} % manual AC/PC definition, assume F.fcsv file inside pt folder
             copyfile([directory,'F.fcsv'],[directory,'F.dat'])
             Ct=readtable([directory,'F.dat']);
-            
-            
-            
-            
-            
-            
+
             % AC
             cnt=1;
             fid(pt).AC=zeros(1,3);
@@ -100,7 +95,7 @@ end
                 fid(pt).AC(cnt)=str2double(thisval{1});
                 cnt=cnt+1;
             end
-            
+
             % PC
             cnt=1;
             fid(pt).PC=zeros(1,3);
@@ -109,8 +104,7 @@ end
                 fid(pt).PC(cnt)=str2double(thisval{1});
                 cnt=cnt+1;
             end
-            
-            
+
             % MSP
             cnt=1;
             fid(pt).MSP=zeros(1,3);
@@ -119,19 +113,15 @@ end
                 fid(pt).MSP(cnt)=str2double(thisval{1});
                 cnt=cnt+1;
             end
-            
-            
-            
+
         case 'mnidirect'
-            
+
             fid(pt).AC=[0.25,   1.298,   -5.003];
             fid(pt).PC=[-0.188, -24.756,  -2.376];
             fid(pt).MSP=[0.25,   1.298,    55];
-            
+
     end
-    
-    
-    
+
     % x-dimension
     A=fid(pt).MSP-fid(pt).AC;
     B=fid(pt).PC-fid(pt).AC;
@@ -159,7 +149,7 @@ end
         case 3 % relative to PC:
             warpcoord_mm=fid(pt).PC+acpc(1)*xvec+acpc(2)*yvec+acpc(3)*zvec;
     end
-    
+
     anat=ea_load_nii([directory,options.prefs.prenii_unnormalized]);
     warpcoord_mm=[warpcoord_mm';1];
     warpcoord_vox=anat.mat\warpcoord_mm;
@@ -168,25 +158,26 @@ end
 
     % check it inverse normparams file has correct voxel size.
     if ~ismember(whichnormmethod,ea_getantsnormfuns)
-    Vinv=spm_vol([directory,'y_ea_inv_normparams.nii']);
-    if ~isequal(Vinv.dim,anat.dim)
-                ea_redo_inv(directory,options);
+        Vinv=spm_vol([directory,'y_ea_inv_normparams.nii']);
+        if ~isequal(Vinv.dim,anat.dim)
+            ea_redo_inv(directory,options);
+        end
     end
+
+    % re-warp into MNI:
+    switch automan
+        case 'mnidirect'
+            fid(pt).WarpedPointMNI=warpcoord_mm(1:3)';
+        otherwise
+            [warpinmni_mm] = ea_map_coords(warpcoord_vox, [directory,options.prefs.prenii_unnormalized], [directory,'y_ea_inv_normparams.nii'], template,whichnormmethod);
+            try
+                warppts(pt,:)=warpinmni_mm';
+            catch
+                keyboard
+            end
+            fid(pt).WarpedPointMNI=warppts(pt,:);
     end
-        % re-warp into MNI:
-switch automan
-    case 'mnidirect'
-        
-     fid(pt).WarpedPointMNI=warpcoord_mm(1:3)';   
-    otherwise
-        [warpinmni_mm] = ea_map_coords(warpcoord_vox, [directory,options.prefs.prenii_unnormalized], [directory,'y_ea_inv_normparams.nii'], template,whichnormmethod);
-try        
-        warppts(pt,:)=warpinmni_mm';
-catch
-    keyboard
-end
-        fid(pt).WarpedPointMNI=warppts(pt,:);
-end
+
     if cfg.mapmethod==2
         anat.img(:)=0;
         anat.img(round(warpcoord_vox(1)),round(warpcoord_vox(2)),round(warpcoord_vox(3)))=1;
@@ -204,17 +195,18 @@ end
         clear matlabbatch
         wfis{pt}=[directory,'wACPCquerypoint.nii'];
     end
+
 end
 %ea_dispercent(1,'end');
 
 % create clear cut version:
 if cfg.mapmethod==1
-    bb=ea_load_nii([leaddir,'templates',filesep,'bb.nii']);
+    bb=ea_load_nii([ea_space,'bb.nii']);
     bb.img(:)=0;
     warppts_vox=[warppts';ones(1,size(warppts,1))];
     warppts_vox=round(bb.mat\warppts_vox);
 
-    for pnt=1:size(warppts_vox,2);
+    for pnt=1:size(warppts_vox,2)
         try
             bb.img(warppts_vox(1,pnt),warppts_vox(2,pnt),warppts_vox(3,pnt))=1;
         end
@@ -224,7 +216,6 @@ if cfg.mapmethod==1
     spm_write_vol(bb,bb.img);
 elseif cfg.mapmethod==2
     % create innativespacemapped files:
-
     matlabbatch{1}.spm.util.imcalc.input = wfis;
     matlabbatch{1}.spm.util.imcalc.output = [FileName];
     matlabbatch{1}.spm.util.imcalc.outdir = {PathName};
@@ -240,22 +231,20 @@ end
 
 if cfg.mapmethod
 % smooth clear version:
+    matlabbatch{1}.spm.spatial.smooth.data = {[PathName,FileName,',1']};
+    matlabbatch{1}.spm.spatial.smooth.fwhm = [1 1 1];
+    matlabbatch{1}.spm.spatial.smooth.dtype = 0;
+    matlabbatch{1}.spm.spatial.smooth.im = 0;
+    matlabbatch{1}.spm.spatial.smooth.prefix = 's';
+    spm_jobman('run',{matlabbatch});
+    clear matlabbatch
 
-matlabbatch{1}.spm.spatial.smooth.data = {[PathName,FileName,',1']};
-matlabbatch{1}.spm.spatial.smooth.fwhm = [1 1 1];
-matlabbatch{1}.spm.spatial.smooth.dtype = 0;
-matlabbatch{1}.spm.spatial.smooth.im = 0;
-matlabbatch{1}.spm.spatial.smooth.prefix = 's';
-spm_jobman('run',{matlabbatch});
-clear matlabbatch
-
-[pth,fn,ext]=fileparts(bb.fname);
-ea_crop_nii([pth,fn,ext]);
-ea_crop_nii([pth,'s',fn,ext]);
+    [pth,fn,ext]=fileparts(bb.fname);
+    ea_crop_nii([pth,fn,ext]);
+    ea_crop_nii([pth,'s',fn,ext]);
 end
+
 assignin('base','fid',fid);
-
-
 
 
 function fidpoints_vox=ea_getfidpoints(fidpoints_mm,tempfile)
@@ -263,9 +252,6 @@ function fidpoints_vox=ea_getfidpoints(fidpoints_mm,tempfile)
 V=spm_vol(tempfile);
 fidpoints_vox=V(1).mat\[fidpoints_mm,ones(size(fidpoints_mm,1),1)]';
 fidpoints_vox=fidpoints_vox(1:3,:)';
-
-
-
 
 
 function o=cell2acpc(acpc)
@@ -278,5 +264,5 @@ if length(acpc)~=3
     end
 end
 for dim=1:3
-o(dim,1)=str2double(acpc{dim});
+    o(dim,1)=str2double(acpc{dim});
 end

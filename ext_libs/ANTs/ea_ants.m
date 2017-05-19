@@ -24,21 +24,32 @@ else
     otherfiles = {};
 end
 
-
 try
-    refine=varargin{6};
+    msks=varargin{6};
+    if isempty(msks)
+        usemasks=0;
+    else
+        if ~iscell(msks)
+            msks={};
+            usemasks=0;
+        else
+            usemasks=1;
+        end
+    end
 catch
-    refine=0;
+    usemasks=0;
 end
+
 try
     options=varargin{7};
 catch
     options=struct;
 end
 
-
-if refine
-    ea_addtsmask(options);
+try
+    interp=varargin{8};
+catch
+    interp='Linear';
 end
 
 outputbase = ea_niifileparts(outputimage);
@@ -68,7 +79,7 @@ if any(imgsize>256)
     rigidsoomthingssigmas='4x3x2x1vox';
 
     affineconvergence='[1000x500x250x0,1e-6,10]';
-    affineshrinkfactors='12x8x4x2';
+    affineshrinkfactors='8x4x2x2';
     affinesoomthingssigmas='4x3x2x1vox';
 else
     rigidconvergence='[1000x500x250x0,1e-6,10]';
@@ -123,7 +134,12 @@ elseif runs==1
         ' --smoothing-sigmas ', affinesoomthingssigmas];
 
 elseif runs==2 % go directly to affine stage, try mattes MI
-    rigidstage = '';
+    rigidstage = [' --transform Rigid[0.1]' ...
+    ' --convergence ', rigidconvergence, ...
+    ' --shrink-factors ', rigidshrinkfactors, ...
+    ' --smoothing-sigmas ', rigidsoomthingssigmas, ...
+    ' --initial-moving-transform [', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1]', ...
+    ' --metric Mattes[', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1,32,Regular,0.25]'];
     affinestage = [
         ' --initial-moving-transform ',ea_path_helper([volumedir, xfm, num2str(runs), '.mat']), ...
         ' --transform Affine[0.1]'...
@@ -131,9 +147,14 @@ elseif runs==2 % go directly to affine stage, try mattes MI
         ' --convergence ', affineconvergence, ...
         ' --shrink-factors ', affineshrinkfactors ...
         ' --smoothing-sigmas ', affinesoomthingssigmas];
-    
+
 elseif runs>=3 % go directly to affine stage, try GC again
-    rigidstage = '';
+    rigidstage = [' --transform Rigid[0.1]' ...
+    ' --convergence ', rigidconvergence, ...
+    ' --shrink-factors ', rigidshrinkfactors, ...
+    ' --smoothing-sigmas ', rigidsoomthingssigmas, ...
+    ' --initial-moving-transform [', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1]', ...
+    ' --metric Mattes[', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1,32,Regular,0.25]'];
     affinestage = [
         ' --initial-moving-transform ',ea_path_helper([volumedir, xfm, num2str(runs), '.mat']), ...
         ' --transform Affine[0.1]'...
@@ -146,49 +167,44 @@ end
 
 
 
-if refine
-    usereaffine=0; % additional affine step based on mask is probably too much.
-    usemaskmov=0;
-    if usemaskmov
-        usemaskonmoving=ea_path_helper([volumedir,'bgmsk.nii']);
-    else
-        usemaskonmoving='nan';
-    end
+if usemasks
+    usereaffine=1; % additional affine step based on mask is probably too much.
+
     rigidstage=[rigidstage, ... % add nonexisting mask for this stage
         ' --masks [nan,nan]'];
     affinestage=[affinestage, ... % add nonexisting mask for this stage
         ' --masks [nan,nan]'];
-    rerigidstage = [' --transform Rigid[0.1]' ...
+    mask1stage = [' --transform Affine[0.1]' ...
         ' --convergence ', rigidconvergence, ...
         ' --shrink-factors ', rigidshrinkfactors, ...
         ' --smoothing-sigmas ', rigidsoomthingssigmas, ...
         ' --initial-moving-transform [', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1]', ...
         ' --metric Mattes[', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1,32,Regular,0.25]', ...
-        ' --masks [', ea_path_helper([volumedir,'bgmsk.nii']),',',usemaskonmoving,']'];
-    if usereaffine
-        reaffinestage = [' --transform Affine[0.1]'...
+        ' --masks [', ea_path_helper(msks{1}),',',ea_path_helper(msks{1}),']'];
+    if length(msks)>1
+        mask2stage = [' --transform Affine[0.1]'...
             ' --metric MI[', ea_path_helper(fixedimage), ',', ea_path_helper(movingimage), ',1,32,Regular,0.25]' ...
             ' --convergence ', affineconvergence, ...
             ' --shrink-factors ', affineshrinkfactors ...
             ' --smoothing-sigmas ', affinesoomthingssigmas ...
-            ' --masks [', ea_path_helper([volumedir,'bgmsk.nii']),',',usemaskonmoving,']'];
+            ' --masks [', ea_path_helper(msks{2}),',',ea_path_helper(msks{2}),']'];
     else
-        reaffinestage='';
+        mask2stage='';
     end
 else
-    rerigidstage='';
-    reaffinestage='';
+    mask1stage='';
+    mask2stage='';
 end
-
 
 ea_libs_helper;
 antscmd = [ANTS, ' --verbose 1' ...
     ' --dimensionality 3 --float 1' ...
     ' --output [',ea_path_helper(outputbase), ',', ea_path_helper(outputimage), ']' ...
-    ' --interpolation Linear' ...
+    ' --interpolation ',interp ...
     ' --use-histogram-matching 1' ...
     ' --winsorize-image-intensities [0.005,0.995]', ...
-    rigidstage, affinestage,rerigidstage,reaffinestage];
+    rigidstage, affinestage,mask1stage,mask2stage];
+
 if writematout % inverse only needed if matrix is written out.
     invaffinecmd = [antsApplyTransforms, ' --verbose 1' ...
         ' --dimensionality 3 --float 1' ...
@@ -196,6 +212,7 @@ if writematout % inverse only needed if matrix is written out.
         ' --transform [', ea_path_helper([outputbase, '0GenericAffine.mat']),',1]' ...
         ' --output Linear[', ea_path_helper([outputbase, 'Inverse0GenericAffine.mat']),']'];
 end
+
 if ~ispc
     system(['bash -c "', antscmd, '"']);
     if writematout
@@ -229,3 +246,14 @@ else
     affinefile = {[volumedir, xfm, num2str(runs+1), '.mat'], ...
                   [volumedir, invxfm, num2str(runs+1), '.mat']};
 end
+
+fprintf('\nANTs LINEAR registration done.\n');
+
+%% add methods dump:
+cits={
+    'Avants, B. B., Epstein, C. L., Grossman, M., & Gee, J. C. (2008). Symmetric diffeomorphic image registration with cross-correlation: evaluating automated labeling of elderly and neurodegenerative brain. Medical Image Analysis, 12(1), 26?41. http://doi.org/10.1016/j.media.2007.06.004'
+    };
+
+ea_methods(volumedir,[mov,' was co-registered to ',fix,' using a two-stage linear registration (rigid followed by affine) as implemented in Advanced Normlization Tools (Avants 2008; http://stnava.github.io/ANTs/)'],...
+    cits);
+

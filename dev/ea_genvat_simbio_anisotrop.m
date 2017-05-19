@@ -54,7 +54,7 @@ if ea_headmodel_changed(options,side,elstruct)
     end
 
     %% convert trajectory mm2vox
-    V=spm_vol([options.earoot,'atlases',filesep,options.atlasset,filesep,'gm_mask.nii']);
+    V=spm_vol([ea_space(options,'atlases'),options.atlasset,filesep,'gm_mask.nii']);
     trajmm=[itraj,ones(length(itraj),1)];
     trajvox=V.mat\trajmm';
     trajvox=trajvox(1:3,:)';
@@ -63,7 +63,7 @@ if ea_headmodel_changed(options,side,elstruct)
 
     %% we will now produce a cubic headmodel that is aligned around the electrode using lead dbs:
 
-    [cimat,~,mat]=ea_sample_cuboid(trajvox,options,[options.earoot,'atlases',filesep,options.atlasset,filesep,'gm_mask.nii'],0,50,70,1); % this will result in ~10x10x10 mm.
+    [cimat,~,mat]=ea_sample_cuboid(trajvox,options,[ea_space(options,'atlases'),options.atlasset,filesep,'gm_mask.nii'],0,50,70,1); % this will result in ~10x10x10 mm.
     mat=mat';
     mkdir([options.root,options.patientname,filesep,'headmodel']);
     Vexp=ea_synth_nii([options.root,options.patientname,filesep,'headmodel',filesep,'structural',num2str(side),'.nii'],mat,[2,0],cimat);
@@ -101,7 +101,7 @@ if ea_headmodel_changed(options,side,elstruct)
 
 
 
-    load([options.earoot,'templates',filesep,'electrode_models',filesep,elspec.matfname])
+    load([ea_getearoot,'templates',filesep,'electrode_models',filesep,elspec.matfname])
     A=[electrode.head_position,1;
         electrode.tail_position,1
         electrode.x_position,1
@@ -112,7 +112,7 @@ if ea_headmodel_changed(options,side,elstruct)
         elstruct.markers(side).x,1;
         elstruct.markers(side).y,1];
     setappdata(resultfig,'elstruct',elstruct);
-    X = ea_linsolve(A,B); X=X';
+    X = mldivide(A,B); X=X';
     ea_dispercent(0,'Exporting insulating components');
 
     for ins=1:length(electrode.insulation)
@@ -205,7 +205,7 @@ if ea_headmodel_changed(options,side,elstruct)
 
         load([options.earoot,'dev',filesep,'bTensor']) % b-Tensor of a simple 6fold diffusion series
         %ftr=load([options.root,options.patientname,filesep,options.prefs.FTR_normalized]);
-        ftr=load([ea_getconnectomebase('dmri'),'Groupconnectome (Horn 2013) thinned out x 50']);
+        ftr=load([ea_getconnectomebase('dmri'),'Groupconnectome (Horn 2013) thinned out x 50',filesep,'data.mat']);
 
         %aniso=ea_ftr2aniso(ftr.normalized_fibers_mm,smri,ten);
         aniso=ea_ftr2aniso(ftr.gibbsconnectome,smri,ten);
@@ -380,7 +380,7 @@ vatvolume=nnz(eg)*spacing(1)*spacing(2)*spacing(3); % returns volume of vat in m
 S(side).volume=vatvolume;
 
 chun1=randperm(100); chun2=randperm(100); chun3=randperm(100);
-Vvat.mat=ea_linsolve([(chun1);(chun2);(chun3);ones(1,100)]',[gv{1}(chun1);gv{2}(chun2);gv{3}(chun3);ones(1,100)]')';
+Vvat.mat=mldivide([(chun1);(chun2);(chun3);ones(1,100)]',[gv{1}(chun1);gv{2}(chun2);gv{3}(chun3);ones(1,100)]')';
 Vvat.dim=[100,100,100];
 Vvat.dt=[4,0];
 Vvat.n=[1 1];

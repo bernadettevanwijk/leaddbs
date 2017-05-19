@@ -23,12 +23,8 @@ for side=1:length(stimparams)
 end
 
 %-----------------------------begin changes----------------
-if options.macaquemodus 
-  load([options.earoot,'toolbox/macaque/atlases',filesep,options.atlasset,filesep,'atlas_index.mat']);
-else
-  load([options.earoot,'atlases',filesep,options.atlasset,filesep,'atlas_index.mat']);  
-%prepare statvat exports once if needed.
-end
+
+  load([ea_space(options,'atlases'),options.atlasset,filesep,'atlas_index.mat']);
 %--------------------------------end changes---------------------------------
 
 
@@ -50,16 +46,16 @@ end
 
 togglenames={'vaton','quivon'};
 for but=1:length(togglenames)
-    
+
     eval([togglenames{but},'=getappdata(resultfig,''',togglenames{but},''');']);
     %fibson=getappdata(resultfig,'fibson');
     expand=1;
     if isempty(eval(togglenames{but}))
         eval([togglenames{but},'=repmat(1,expand,length(options.sides));']);
     end
-    
+
     setappdata(resultfig,togglenames{but},eval(togglenames{but}));
-    
+
 end
 clear expand
 
@@ -99,10 +95,10 @@ end
 
 for side=1:length(options.sides)
     % if options.expstatvat.do;    thisvatnii=cell(length(options.expstatvat.vars),1); end
-    
+
     for vat=1:length(VAT{side}.VAT)
-        
-        
+
+
         if ~exist('K','var') % e.g. maedler model used
             try
                 K(side).K{vat}=convhulln(VAT{side}.VAT{vat}+randn(size(VAT{side}.VAT{vat}))*0.000001); % create triangulation.
@@ -118,62 +114,70 @@ for side=1:length(options.sides)
                 K(side).K{vat}=convhulln(VAT{side}.VAT{vat}+randn(size(VAT{side}.VAT{vat}))*0.000001); % create triangulation.
             end
         end
-        
+
         % show vat
-        
+
         if ~isempty(K(side).K{vat})
-            
+
             PL.vatsurfs(side,vat)=trisurf(K(side).K{vat},VAT{side}.VAT{vat}(:,1),VAT{side}.VAT{vat}(:,2),VAT{side}.VAT{vat}(:,3),...
                 abs(repmat(60,length(VAT{side}.VAT{vat}),1)...
                 +randn(length(VAT{side}.VAT{vat}),1)*2)');
-            
-            
 
-            
+
+
+
             % the following is some code required for
             % Web/JSON/BrainBrowser-Export.
             PL.vatfv(side,vat).vertices=[VAT{side}.VAT{vat}(:,1),VAT{side}.VAT{vat}(:,2),VAT{side}.VAT{vat}(:,3)];
             PL.vatfv(side,vat).faces=K(side).K{vat};
             PL.vatfv(side,vat).normals=get(PL.vatsurfs(side,vat),'Vertexnormals');
             PL.vatfv(side,vat).colors=repmat([1,0,0,0.7],size(PL.vatfv(side,vat).vertices,1),1);
-            
+
             ea_spec_atlas(PL.vatsurfs(side,vat),'vat',jet,1);
-            
+
             vatgrad=getappdata(resultfig,'vatgrad');
             if ~isempty(vatgrad)
                 reduc=1;
-                
+
                 %             PL.quiv(side)=ea_arrow3([vatgrad.x(1:reduc:end),vatgrad.y(1:reduc:end),vatgrad.z(1:reduc:end)]-...
                 %                 1/2*[vatgrad.qx(1:reduc:end),vatgrad.qy(1:reduc:end),vatgrad.qz(1:reduc:end)],...
                 %                 [vatgrad.x(1:reduc:end),vatgrad.y(1:reduc:end),vatgrad.z(1:reduc:end)]+...
                 %                 1/2*[vatgrad.qx(1:reduc:end),vatgrad.qy(1:reduc:end),vatgrad.qz(1:reduc:end)]);
                 try % only one hemisphere could be defined.
                     if stimparams(side).volume
-                        
+
                         PL.quiv(side)=quiver3(vatgrad(side).x(1:reduc:end),vatgrad(side).y(1:reduc:end),vatgrad(side).z(1:reduc:end),vatgrad(side).qx(1:reduc:end),vatgrad(side).qy(1:reduc:end),vatgrad(side).qz(1:reduc:end),0,'w-','LineWidth',1);
                     end
                 end
             end
-            
-            
-            
+
+
+
             if options.writeoutstats
                 ea_dispt('Writing out stats...');
-                
-                
+
+
                 load([options.root,options.patientname,filesep,'ea_stats']);
                 
-                                ea_stats.stimulation(thisstim).vat(side,vat).amp=S.amplitude{side};
-                                ea_stats.stimulation(thisstim).vat(side,vat).label=S.label;
-                                ea_stats.stimulation(thisstim).vat(side,vat).contact=vat;
-                                ea_stats.stimulation(thisstim).vat(side,vat).side=side;
+                ea_stats.stimulation(thisstim).vat(side,vat).amp=S.amplitude{side};
+                ea_stats.stimulation(thisstim).vat(side,vat).label=S.label;
+                ea_stats.stimulation(thisstim).vat(side,vat).contact=vat;
+                ea_stats.stimulation(thisstim).vat(side,vat).side=side;
                 
+                vatfv.faces=K(side).K{vat}; vatfv.vertices=VAT{side}.VAT{vat};
+                vatfv=reducepatch(vatfv,0.05);
+                                        Vcent=mean(vatfv.vertices);
+
+                % figure
+                % patch('faces',vatfv.faces,'vertices',vatfv.vertices,'FaceColor','none','EdgeColor','g');
+                % patch('faces',nfv.faces,'vertices',nfv.vertices,'FaceColor','none','EdgeColor','r');
                 
                 
                 for atlas=1:size(atlases.XYZ,1)
                     
                     if stimparams(side).volume(vat)>0 % stimulation on in this VAT,
                         clear thisatl
+
                         
                         if isempty(atlases.XYZ{atlas,side}) % for midline or combined atlases, only the right side atlas is used.
                             thisatl=atlases.XYZ{atlas,1}.mm;
@@ -182,32 +186,45 @@ for side=1:length(options.sides)
                             thisatl=atlases.XYZ{atlas,side}.mm;
                             tpd=atlases.pixdim{atlas,side};
                         end
-                        tpv=abs(tpd(1))*abs(tpd(2))*abs(tpd(3)); % volume of one voxel in mm^3.
                         
-                        ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)=sum(ea_intriangulation(VAT{side}.VAT{vat},K(side).K{vat},thisatl))*tpv;
-                        ea_stats.stimulation(thisstim).vat(side,vat).nAtlasIntersection(atlas)=ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)/stimparams(1,side).volume(vat);
-                    
-                    else % simply set vi to zero.
+                        %% this search strategy commented out for now ? would fail in case of a very large atlas structure with VAT in center of it touching no border.
+%                         % roughly check if this nucleus could be close to
+%                         % VTA centroid:
+%                         [~,D]=knnsearch(Vcent,thisatl);
+%                         if any(D<(1.5*maedler12_eq3(max(S.amplitude{side}),1000))) % VAT is close to nucleus, should check volume of intersection.
+%                             
+                            tpv=abs(tpd(1))*abs(tpd(2))*abs(tpd(3)); % volume of one voxel in mm^3.
+                            
+                            
+                            ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)=sum(ea_intriangulation(vatfv.vertices,vatfv.faces,thisatl))*tpv;
+                            
+                            ea_stats.stimulation(thisstim).vat(side,vat).nAtlasIntersection(atlas)=ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)/stimparams(1,side).volume(vat);
+%                         else % all points too far from VTA center - simply set vi to zero.
+%                             ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)=0;
+%                             ea_stats.stimulation(thisstim).vat(side,vat).nAtlasIntersection(atlas)=0;
+%                             
+%                         end
+                    else % no voltage on this vat, simply set vi to zero.
                         ea_stats.stimulation(thisstim).vat(side,vat).AtlasIntersection(atlas)=0;
                         ea_stats.stimulation(thisstim).vat(side,vat).nAtlasIntersection(atlas)=0;
                         
                     end
                 end
-                
+
                            save([options.root,options.patientname,filesep,'ea_stats'],'ea_stats');
 
             end
         end
-        
-        
+
+
     end
-    
+
 
     try
         vatbutton(side)=uitoggletool(PL.ht,'CData',ea_get_icn('vat',options),'TooltipString','Volume of activated tissue','OnCallback',{@objvisible,PL.vatsurfs(side,:),resultfig,'vaton',[],side,1},'OffCallback',{@objvisible,PL.vatsurfs(side,:),resultfig,'vaton',[],side,0},'State',getstate(vaton(side)));
         quivbutton(side)=uitoggletool(PL.ht,'CData',ea_get_icn('quiver',options),'TooltipString','E-field','OnCallback',{@objvisible,PL.quiv(side),resultfig,'quivon',[],side,1},'OffCallback',{@objvisible,PL.quiv(side),resultfig,'quivon',[],side,0},'State',getstate(quivon(side)));
     end
-    
+
 end
 
 
@@ -217,19 +234,19 @@ end
 
 
 for side=1:length(options.sides)
-    
+
     if ~vaton(side)
         try
             objvisible([],[],PL.vatsurfs(side,:),resultfig,'vaton',[],side,0)
         end
     end
-    
+
     if ~quivon(side)
         try
             objvisible([],[],PL.quiv(side),resultfig,'quivon',[],side,0)
         end
     end
-    
+
 end
 
 
@@ -267,6 +284,22 @@ setappdata(resultfig,what,tvalue);
 %disp([atls,'visible clicked']);
 
 
+
+function r=maedler12_eq3(U,Im)
+% This function radius of Volume of Activated Tissue for stimulation settings U and Ohm. See Maedler 2012 for details.
+% Clinical measurements of DBS electrode impedance typically range from
+% 500?1500 Ohm (Butson 2006).
+r=0; %
+if U %(U>0)
+
+    k1=-1.0473;
+    k3=0.2786;
+    k4=0.0009856;
+
+    r=-(k4*Im-sqrt(k4^2*Im^2  +   2*k1*k4*Im    +   k1^2 +   4*k3*U)   +   k1)...
+        /...
+        (2*k3);
+end
 
 
 function C=rgb(C) % returns rgb values for the colors.
@@ -395,14 +428,14 @@ switch p
     case 2
         % really simple for 2-d
         nrmls = (xyz(tess(:,1),:) - xyz(tess(:,2),:)) * [0 1;-1 0];
-        
+
         % Any degenerate edges?
         del = sqrt(sum(nrmls.^2,2));
         degenflag = (del<(max(del)*10*eps));
         if sum(degenflag)>0
             warning('inhull:degeneracy',[num2str(sum(degenflag)), ...
                 ' degenerate edges identified in the convex hull'])
-            
+
             % we need to delete those degenerate normal vectors
             nrmls(degenflag,:) = [];
             nt = size(nrmls,1);
@@ -434,7 +467,7 @@ switch p
         if sum(degenflag)>0
             warning('inhull:degeneracy',[num2str(sum(degenflag)), ...
                 ' degenerate simplexes identified in the convex hull'])
-            
+
             % we need to delete those degenerate normal vectors
             nrmls(degenflag,:) = [];
             nt = size(nrmls,1);
@@ -490,13 +523,13 @@ if nargin==2
     if strcmp(varargin{2},'end')
         fprintf('\n')
         fprintf('\n')
-        
+
         fprintf('\n')
-        
+
     else
         fprintf(1,[varargin{2},':     ']);
-        
-        
+
+
     end
 else
     fprintf(1,[repmat('\b',1,(length(num2str(percent))+1)),'%d','%%'],percent);
@@ -1311,7 +1344,7 @@ else
     elseif findstr(s,'*'), ls='*'; s=strrep(s,'*','');
     else ls='-';
     end
-    
+
     % identify linewidth
     tmp=double(s);
     tmp=find(tmp>45 & tmp<58);
@@ -1320,7 +1353,7 @@ else
         s(tmp)='';
     else lw=0.5;
     end
-    
+
     % identify color
     if length(s), s=lower(s);
         if length(s)>1, c=s(1:2);

@@ -1,10 +1,16 @@
 function slice=ea_contrast(slice,contrast,offset)
-
-
-slice(:)=contrast*zscore(slice(:));
+if ~exist('contrast','var')
+    contrast=1;
+end
+if ~exist('offset','var')
+    offset=0;
+end
+%disp([num2str(contrast),',',num2str(offset)]);
+slice(slice(:)~=0)=contrast*zscore(slice(slice(:)~=0));
 slice=slice+offset;
-
-slice=ea_sigmoid(slice);
+slice(slice>3)=3; % cut at 3 std devs if above
+slice(slice<-3)=-3; % cut at -3 std devs if above
+slice=ea_minmax(slice);
 
 
 

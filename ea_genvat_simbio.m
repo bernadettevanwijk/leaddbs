@@ -19,13 +19,15 @@ if nargin==5
     if useSI
         %thresh=thresh.*(10^-3);
     end
-elseif nargin==6
+elseif nargin==7
     acoords=varargin{1};
     S=varargin{2};
     side=varargin{3};
     options=varargin{4};
     stimname=varargin{5};
     thresh=varargin{6};
+        lgfigure=varargin{7};
+
 elseif nargin==1
     if ischar(varargin{1}) % return name of method.
         varargout{1}='SimBio/FieldTrip';
@@ -92,7 +94,7 @@ if ea_headmodel_changed(options,side,S,elstruct)
 
     %% convert trajectory mm2vox
 
-    V=spm_vol([options.earoot,'atlases',filesep,options.atlasset,filesep,'gm_mask.nii']);
+    V=spm_vol([ea_space(options,'atlases'),options.atlasset,filesep,'gm_mask.nii']);
     trajmm=[itraj,ones(length(itraj),1)];
     trajvox=V.mat\trajmm';
     trajvox=trajvox(1:3,:)';
@@ -108,9 +110,9 @@ if ea_headmodel_changed(options,side,S,elstruct)
 
     %% we will now produce a cubic headmodel that is aligned around the electrode using lead dbs:
 
-    [cimat,~,mat]=ea_sample_cuboid(trajvox,options,[options.earoot,'atlases',filesep,options.atlasset,filesep,'gm_mask.nii'],0,modelwidth,150,1); % set to 250 / 400 this will result in ~10x10x10 mm.
+    [cimat,~,mat]=ea_sample_cuboid(trajvox,options,[ea_space(options,'atlases'),options.atlasset,filesep,'gm_mask.nii'],0,modelwidth,150,1); % set to 250 / 400 this will result in ~10x10x10 mm.
     cimat(isnan(cimat))=0; % for out of FOV values.
-    
+
     mat=mat';
     mkdir([options.root,options.patientname,filesep,'headmodel']);
     Vexp=ea_synth_nii([options.root,options.patientname,filesep,'headmodel',filesep,'structural',num2str(side),'.nii'],mat,[2,0],cimat);
@@ -147,7 +149,7 @@ if ea_headmodel_changed(options,side,S,elstruct)
 
 
 
-    load([options.earoot,'templates',filesep,'electrode_models',filesep,elspec.matfname])
+    load([ea_getearoot,'templates',filesep,'electrode_models',filesep,elspec.matfname])
     A=[electrode.head_position,1;
         electrode.tail_position,1
         electrode.x_position,1
@@ -160,7 +162,7 @@ if ea_headmodel_changed(options,side,S,elstruct)
     try
         setappdata(resultfig,'elstruct',elstruct);
     end
-    X = linsolve(A,B); X=X';
+    X = mldivide(A,B); X=X';
     ea_dispercent(0,'Exporting insulating components');
 
     for ins=1:length(electrode.insulation)
@@ -275,7 +277,7 @@ if ea_headmodel_changed(options,side,S,elstruct)
         disp('Done. Estimating diffusion signal based on fibertracts...');
         signal=ea_ftr2Sigmaps(ftr,ten);
         disp('Done. Calculating Tensors...');
-        reftemplate=[options.earoot,'templates',filesep,'dartel',filesep,'dartelmni_1.nii,2'];
+        reftemplate=[ea_space(options,'dartel'),'dartelmni_1.nii,2'];
         Vsig=spm_vol(reftemplate);
         for i=1:size(signal,4);
             Vsig.fname=[options.root,options.patientname,filesep,'headmodel',filesep,'dti_',num2str(i),'.nii'];
@@ -311,7 +313,7 @@ if ea_headmodel_changed(options,side,S,elstruct)
     end
 
     try
-        
+
             vol=ea_ft_headmodel_simbio(mesh,'conductivity',SIfx*[0.0915 0.059 1/(10^(-8)) 1/(10^16)]); % multiply by thousand to use S/mm
         %vol=ea_ft_headmodel_simbio(mesh,'conductivity',[0.33 0.33 1/(10^(-8)) 1/(10^16)]); % multiply by thousand to use S/mm
         %vol=ea_ft_headmodel_simbio(mesh,'conductivity',1000*[0.33 0.33 1/(10^(-8)) 1/(10^16)]); % multiply by thousand to use S/mm
@@ -441,7 +443,7 @@ vol.pos=vol.pos*SIfx; % convert back to mm.
     norm_gradient(ixx,:)=pols;
     %
     vatgrad(side).qx=norm_gradient(:,1); vatgrad(side).qy=norm_gradient(:,2); vatgrad(side).qz=norm_gradient(:,3);
-    
+
     try
         setappdata(resultfig,'vatgrad',vatgrad);
     end
@@ -503,7 +505,7 @@ S(side).volume=vatvolume;
 
 
 chun1=randperm(100); chun2=randperm(100); chun3=randperm(100);
-Vvat.mat=linsolve([(chun1);(chun2);(chun3);ones(1,100)]',[gv{1}(chun1);gv{2}(chun2);gv{3}(chun3);ones(1,100)]')';
+Vvat.mat=mldivide([(chun1);(chun2);(chun3);ones(1,100)]',[gv{1}(chun1);gv{2}(chun2);gv{3}(chun3);ones(1,100)]')';
 Vvat.dim=[100,100,100];
 Vvat.dt=[4,0];
 Vvat.n=[1 1];

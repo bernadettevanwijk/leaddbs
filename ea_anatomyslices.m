@@ -1,4 +1,4 @@
-function ea_anatomyslices(resultfig,togglestates,options)
+function ea_anatomyslices(resultfig,togglestates,options,controlhandles)
 % input xyz in mm coordinates.
 % this function plots an anatomical slice to the 3D viewer of lead-dbs.
 % __________________________________________________________________________________
@@ -11,247 +11,156 @@ atlases=getappdata(resultfig,'atlases');
 togglestates.xyztransparencies=double(togglestates.xyztransparencies/100);
 
 xsliceplot=getappdata(resultfig,'xsliceplot');
-try delete(xsliceplot); end
 ysliceplot=getappdata(resultfig,'ysliceplot');
-try delete(ysliceplot); end
-
 zsliceplot=getappdata(resultfig,'zsliceplot');
-try delete(zsliceplot); end
 
+%% Parse togglestates
+if ~isempty(xsliceplot) && ~togglestates.refreshcuts
+    switch togglestates.cutview
+        case 'xcut'
+            set(xsliceplot,'Visible','on')
+            set(ysliceplot,'Visible','off')
+            set(zsliceplot,'Visible','off')
+            ea_settransparency(resultfig,togglestates)
+            setappdata(resultfig,'xsliceplot',xsliceplot);
+            setappdata(resultfig,'ysliceplot',ysliceplot);
+            setappdata(resultfig,'zsliceplot',zsliceplot);
+        case 'ycut'
+            set(xsliceplot,'Visible','off')
+            set(ysliceplot,'Visible','on')
+            set(zsliceplot,'Visible','off')
+            ea_settransparency(resultfig,togglestates)
+            setappdata(resultfig,'xsliceplot',xsliceplot);
+            setappdata(resultfig,'ysliceplot',ysliceplot);
+            setappdata(resultfig,'zsliceplot',zsliceplot);
+        case 'zcut'
+            set(xsliceplot,'Visible','off')
+            set(ysliceplot,'Visible','off')
+            set(zsliceplot,'Visible','on')
+            ea_settransparency(resultfig,togglestates)
+            setappdata(resultfig,'xsliceplot',xsliceplot);
+            setappdata(resultfig,'ysliceplot',ysliceplot);
+            setappdata(resultfig,'zsliceplot',zsliceplot);
+        case '3d'
+            set(xsliceplot,'Visible','on')
+            set(ysliceplot,'Visible','on')
+            set(zsliceplot,'Visible','on')
+            ea_settransparency(resultfig,togglestates)
+            setappdata(resultfig,'xsliceplot',xsliceplot);
+            setappdata(resultfig,'ysliceplot',ysliceplot);
+            setappdata(resultfig,'zsliceplot',zsliceplot);
+    end
+end
+
+if ~isempty(xsliceplot) && ~isequal(togglestates.xyztoggles,[1 1 1]) && strcmp(togglestates.cutview,'3d')
+    if togglestates.xyztoggles(1)
+        set(xsliceplot,'Visible','on');
+    else
+        set(xsliceplot,'Visible','off');
+    end
+    if togglestates.xyztoggles(2)
+        set(ysliceplot,'Visible','on');
+    else
+        set(ysliceplot,'Visible','off');
+    end
+    if togglestates.xyztoggles(3)
+        set(zsliceplot,'Visible','on');
+    else
+        set(zsliceplot,'Visible','off');
+    end    
+    ea_settransparency(resultfig,togglestates)
+    setappdata(resultfig,'xsliceplot',xsliceplot);
+    setappdata(resultfig,'ysliceplot',ysliceplot);
+    setappdata(resultfig,'zsliceplot',zsliceplot);
+end
+
+if (~togglestates.refreshcuts) && (~togglestates.refreshview)
+    return
+end
+
+
+%% Render slices
 V=getappdata(resultfig,'V');
 inverted=getappdata(resultfig,'inverted');
 if isempty(inverted)
     inverted=0;
 end
 options.d2.writeatlases=1;
-templateused=getappdata(resultfig,'templateused');
-
-
-mcr=ea_checkmacaque(options);
-
 
 if ~isfield(options,'native')
     options.native=0;
 end
 
-if ~strcmp(templateused,togglestates.template) || isempty(V) % reload image(s)
+if togglestates.refreshcuts % reload image(s)
     clear V
     [V1,V2,V3]=ea_assignbackdrop(togglestates.template,options,'Patient',options.native);
-
     V{1}=V1; V{2}=V2; V{3}=V3;
     setappdata(resultfig,'templateused',togglestates.template); % refresh used template.
 end
 
-
-
 if ~inverted==togglestates.tinvert
-    inverted=togglestates.tinvert;
-else
-    
+    inverted=togglestates.tinvert;    
 end
-    
-togglestates.xyzmm=[togglestates.xyzmm';1];
+
 try
-xyzv= V{1}.mat \ togglestates.xyzmm;
-catch
-    keyboard
+    if get(controlhandles.slicepopup,'Value')==1
+
+        togglestates.xyzmm=[togglestates.xyzmm';1];
+
+        try
+            xyzv= V{1}.mat \ togglestates.xyzmm;
+        catch
+            keyboard
+        end
+
+        xyzv=round(xyzv(1:3)); % now in voxel coordinates.
+        %keyboard
+
+    elseif get(controlhandles.slicepopup,'Value')==2
+
+        xyzv = togglestates.xyzmm;
+        % xyzv= V{1}.mat * togglestates.xyzmm;
+
+    end
+catch % direct call from script.
+    xyzv = V{1}.mat \ [togglestates.xyzmm,1]';
 end
-xyzv=round(xyzv(1:3)); % now in voxel coordinates.
 
-%colormap gray
-
-
+% balance the contrast
+% if togglestates.refreshcuts
+% [balanced,colormap] = ea_autocontrast(double(V{1}.private.dat),2.5);
+% end
 
 if togglestates.xyztoggles(1)
-
-    
-    usesag=(length(V)>2)*2; % check if explicit saggital volume is available
-    if inverted
-        [~,slice]=ea_writeplanes(options, togglestates.xyzmm(1),3,V{1+usesag},'off', 0,atlases);
-        
-        if V{1}.mat(11)>0
-            slice=flip(permute(double(slice),[2,1,3]),2);
-        else
-            slice=permute(double(slice),[2,1,3]);
-        end
-        
-        if V{1}.mat(6)<0
-            slice=flip(slice,1);
-        end
-
-        
-        %slice=flipdim(slice,1);
-    else
-        
-        [xx,yy,zz]=meshgrid(xyzv(1),1:0.5:V{1+usesag}.dim(2),1:0.5:V{1+usesag}.dim(3));
-        slice=spm_sample_vol(V{1+usesag},xx,yy,zz,1);
-    end
-    
-    %slice=ea_invert(slice,inverted);
-    imin=proxy_slice(slice,togglestates,1);
-    clear bb
-    bb(1,:)=[xyzv(1),V{1+usesag}.dim(2),V{1+usesag}.dim(3),1]; % upper left point of image in voxels
-    bb(2,:)=[xyzv(1),0,V{1+usesag}.dim(3),1];
-    bb(3,:)=[xyzv(1),V{1+usesag}.dim(2),0,1];
-    bb(4,:)=[xyzv(1),0,0,1];
-    
-    bb(:,1:3)=bb(:,1:3);
-    
-    bb=V{1+usesag}.mat*bb'; % in mm
-    bb=bb(1:3,:)';
-    %zsliceplot=imsurf(imin,ulp,[1,0,0],[0,0,-1],scale);
-    
-    xsliceplot=surface('XData',[min(bb(:,1)) max(bb(:,1));min(bb(:,1)) max(bb(:,1))],...
-        'YData',[min(bb(:,2)) min(bb(:,2));max(bb(:,2)), max(bb(:,2))],...
-        'ZData',[min(bb(:,3)) max(bb(:,3)); min(bb(:,3)) max(bb(:,3))],...
-        'CData',imin(:,:,1:3),...
-        'FaceColor','texturemap','AlphaDataMapping','none','FaceAlpha',togglestates.xyztransparencies(1),'EdgeColor','none');
-    %set(xsliceplot,'SpecularColorReflectance',0)
-    set(xsliceplot,'SpecularStrength',0.1)
-    bbmm{1}=linspace(bb(1,1),bb(4,1),20);
-    bbmm{2}=linspace(bb(1,2),bb(2,2),20);
-    bbmm{3}=linspace(bb(1,3),bb(3,3),20);
-    %ea_add_overlay_3d(bbmm,resultfig,3,options);
-    
-    %surface('XData',[max(ulp(:,1)),min(ulp(:,1))],'YData',[min(ulp(:,2)),max(ulp(:,2))],'ZData',[min(ulp(:,3)),max(ulp(:,3))],'CData',imin(:,:,1:3));
-    %catch
-    %    disp('Z-Volume cut out of bounds.');
-    %end
-    
+    usesag=(length(V)>2)*2; % check if explicit saggital volume is available    
+    xsliceplot=slice3i(resultfig,V{1+usesag}.private.dat,V{1+usesag}.mat,1,xyzv(1),controlhandles);
 end
 
 if togglestates.xyztoggles(2)
-    
     % check whether second nii is being used:
-    usecor=length(V)>1; % check if explicit coronar volume is available
-    if inverted
-        [~,slice]=ea_writeplanes(options, togglestates.xyzmm(2),2,V{1+usecor},'off', 0,atlases);
-        
-        if V{1}.mat(6)>0
-            slice=flip(permute(double(slice),[2,1,3]),2);
-        else
-            slice=permute(double(slice),[2,1,3]);
-        end
-        
-        if V{1}.mat(11)<0
-            slice=flip(slice,1);
-        end
-        
-    else
-        [xx,yy,zz]=meshgrid(1:0.5:V{1+usecor}.dim(1),xyzv(2),1:0.5:V{1+usecor}.dim(3));
-        slice=flip(flipud(squeeze((spm_sample_vol(V{1+usecor},squeeze(xx),squeeze(yy),squeeze(zz),2)))),1);
-    end
-    %slice=ea_invert(slice,inverted);
-    
-    %slice=flipud(squeeze(double(nii{1+usecor}.img(:,xyzv(2),:))));
-    imin=proxy_slice(slice,togglestates,2);
-    clear bb
-    bb(1,:)=[V{1+usecor}.dim(1),xyzv(2),V{1+usecor}.dim(3),1]; % upper left point of image in voxels
-    bb(2,:)=[0,xyzv(2),V{1+usecor}.dim(3),1]; % upper left point of image in voxels
-    bb(3,:)=[V{1+usecor}.dim(1),xyzv(2),0,1]; % upper left point of image in voxels
-    bb(4,:)=[0,xyzv(2),0,1]; % upper left point of image in voxels
-    
-    bb(:,1:3)=bb(:,1:3);
-    
-    bb=V{1+usecor}.mat*bb'; % in mm
-    bb=bb(1:3,:)';
-    
-    
-    ysliceplot=surface('XData',[min(bb(:,1)) min(bb(:,1));max(bb(:,1)) max(bb(:,1))],...
-        'YData',[min(bb(:,2)) max(bb(:,2));min(bb(:,2)), max(bb(:,2))],...
-        'ZData',[min(bb(:,3)) max(bb(:,3)); min(bb(:,3)) max(bb(:,3))],...
-        'CData',imin(:,:,1:3),...
-        'FaceColor','texturemap','AlphaDataMapping','none','FaceAlpha',togglestates.xyztransparencies(2),'EdgeColor','none');
-    set(ysliceplot,'SpecularStrength',0.1)
-    set(ysliceplot,'DiffuseStrength',0.5)
-    set(ysliceplot,'AmbientStrength',1)
-
-bbmm{1}=linspace(bb(1,1),bb(4,1),20);
-bbmm{2}=linspace(bb(1,2),bb(2,2),20);
-bbmm{3}=linspace(bb(1,3),bb(3,3),20);
-%ea_add_overlay_3d(bbmm,resultfig,2,options);
-    %ysliceplot=imsurf(imin,ulp,[0,1,0],[-1,0,0],scale);
-    %catch
-    %    disp('Y-Volume cut out of bounds.');
-    %end
+    usecor=length(V)>1; % check if explicit coronal volume is available    
+    ysliceplot=slice3i(resultfig,V{1+usecor}.private.dat,V{1+usecor}.mat,2,xyzv(2),controlhandles);
 end
 
 if togglestates.xyztoggles(3)
-    %try
-    %imsurf(repmat(uint8((squeeze(fliplr(nii.img(:,:,graphopts.volxyz(3)))'*255)/max(nii.img(:)))),[1,1,2]),[size(nii.img,1)+0.5,size(nii.img,2)+0.5,graphopts.volxyz(3)],[0,0,1],[-1,0,0],1)
-    %original: imin=repmat(uint8((squeeze(fliplr(nii.img(:,:,xyzv(1)))'*255)/max(nii.img(:)))),[1,1,4]);
-    
-    if inverted
-        [~,slice]=ea_writeplanes(options, togglestates.xyzmm(3),1,V{1},'off', 0,atlases);
-        if V{1}.mat(1)>0
-        slice=flip(permute(double(slice),[2,1,3]),2);
-        else
-        slice=permute(double(slice),[2,1,3]);
-        end
-        
-        if V{1}.mat(6)<0
-            slice=flip(slice,1);
-        end
-        
-    else
-        [xx,yy,zz]=meshgrid(1:0.2:V{1}.dim(1),1:0.2:V{1}.dim(2),xyzv(3));
-        if V{1}.mat(1)<0
-        slice=flip(spm_sample_vol(V{1},xx,yy,zz,4)',1);
-        else
-        slice=spm_sample_vol(V{1},xx,yy,zz,4)';            
-        end
-    end
-    %slice=ea_invert(slice,inverted);
-    %slice=flipud(squeeze(double((nii{1}.img(:,:,xyzv(3))))));
-    imin=proxy_slice(slice,togglestates,3);
-        clear bb
-    bb(1,:)=[V{1}.dim(1),V{1}.dim(2),xyzv(3),1]'; % upper left point of image in voxels
-    bb(2,:)=[0,V{1}.dim(2),xyzv(3),1]'; % upper left point of image in voxels
-    bb(3,:)=[V{1}.dim(1),0,xyzv(3),1]'; % upper left point of image in voxels
-    bb(4,:)=[0,0,xyzv(3),1]'; % upper left point of image in voxels
-
-    bb(:,1:3)=bb(:,1:3);
-    bb(:,1)=bb(:,1);
-    bb=V{1}.mat*bb'; % in mm
-    bb=bb(1:3,:)';
-    
-    zsliceplot=surface('XData',[min(bb(:,1)) min(bb(:,1));max(bb(:,1)) max(bb(:,1))],...
-   'YData',[min(bb(:,2)) max(bb(:,2));min(bb(:,2)), max(bb(:,2))],...
-   'ZData',[min(bb(:,3)) max(bb(:,3));min(bb(:,3)) max(bb(:,3))],...
-   'CData',imin(:,:,1:3),...
-    'FaceColor','texturemap','AlphaDataMapping','none','FaceAlpha',togglestates.xyztransparencies(3),'EdgeColor','none');    
-set(zsliceplot,'SpecularStrength',0)
-set(zsliceplot,'DiffuseStrength',0.5)
-set(zsliceplot,'AmbientStrength',0.3)
-
-    
-
-%xsliceplot=imsurf(imin,bb,[0,0,1],[-1,0,0],scale);
-    bbmm{1}=linspace(bb(1,1),bb(4,1),20);
-    bbmm{2}=linspace(bb(1,2),bb(2,2),20);
-    bbmm{3}=linspace(bb(1,3),bb(3,3),20);
-    %ea_add_overlay_3d(bbmm,resultfig,1,options);
-    %catch
-    %    disp('X-Volume cut out of bounds.');
-    %end
+	zsliceplot=slice3i(resultfig,V{1}.private.dat,V{1}.mat,3,xyzv(3),controlhandles);
 end
+
+%colormap(cmap);
 
 % store data in figure
 setappdata(resultfig,'xsliceplot',xsliceplot);
 setappdata(resultfig,'ysliceplot',ysliceplot);
 setappdata(resultfig,'zsliceplot',zsliceplot);
+%ea_settransparency(resultfig,togglestates)
 setappdata(resultfig,'V',V);
 setappdata(resultfig,'inverted',inverted);
 
 
-
-
 function slice=ea_invert(slice,flag)
 if flag
-slice=slice*-1+max(slice(:));
+    slice=slice*-1+max(slice(:));
 end
-
-
 
 
 function imin=proxy_slice(slice,togglestates,dim)

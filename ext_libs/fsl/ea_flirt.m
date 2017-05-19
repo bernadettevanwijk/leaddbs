@@ -37,7 +37,7 @@ if isempty(dir([fixedimage_bet,'.nii*']))
     ea_bet(fixedimage, 1, fixedimage_bet);
 end
 
-volumedir = [fileparts(ea_niifileparts(movingimage)), filesep]; 
+volumedir = [fileparts(ea_niifileparts(movingimage)), filesep];
 
 % name of the output transformation
 [~, mov] = ea_niifileparts(movingimage);
@@ -81,13 +81,13 @@ flirtcmd = [FLIRT, ...
             ' -out ', ea_path_helper(outputimage) ...
             affinestage];
 
-% Output inverse xfm because FSL won't handle the inversion internally when
-% apply the transformation
+% Output inverse xfm for possible further use
+% FSL won't handle the inversion internally when applying the transformation
 invxfm = [fix, '2', mov, '_flirt'];
 convertxfmcmd = [COVERT_XFM, ...
               ' -omat ', ea_path_helper([volumedir, invxfm, num2str(runs+1), '.mat']), ...
               ' -inverse ', ea_path_helper([volumedir, xfm, num2str(runs+1), '.mat'])];
-          
+
 setenv('FSLOUTPUTTYPE','NIFTI');
 if ~ispc
     system(['bash -c "', flirtcmd, '"']);
@@ -113,4 +113,14 @@ else
                   [volumedir, invxfm, num2str(runs+1), '.mat']};
 end
 
-fprintf('\nFSL FLIRT finished\n');
+fprintf('\nFSL FLIRT done.\n');
+
+%% add methods dump:
+cits={
+    'M. Jenkinson and S.M. Smith. A global optimisation method for robust affine registration of brain images. Medical Image Analysis, 5(2):143-156, 2001.'
+    'M. Jenkinson, P.R. Bannister, J.M. Brady, and S.M. Smith. Improved optimisation for the robust and accurate linear registration and motion correction of brain images. NeuroImage, 17(2):825-841, 2002.'
+    };
+
+ea_methods(volumedir,[mov,' was linearly co-registered to ',fix,' using FLIRT as implemented in FSL (Jenkinson 2001; Jenkinson 2002; https://fsl.fmrib.ox.ac.uk/)'],...
+    cits);
+

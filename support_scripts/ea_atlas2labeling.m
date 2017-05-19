@@ -1,14 +1,12 @@
 function ea_atlas2labeling(atlasname,spacefile)
-    
 
-earoot=ea_getearoot;
 
-copyfile([earoot,'atlases',filesep,atlasname],[earoot,'atlases',filesep,atlasname,'_copy']);
+copyfile([ea_space([],'atlases'),atlasname],[ea_space([],'atlases'),atlasname,'_copy']);
 if ~exist('spacefile','var')
-spacefile=[earoot,'templates',filesep,'mni_hires_t2.nii'];
+spacefile=[ea_space,'t2.nii'];
 end
 
-copybase=[earoot,'atlases',filesep,atlasname,'_copy',filesep];
+copybase=[ea_space([],'atlases'),atlasname,'_copy',filesep];
 
 subfs={'lh','rh','mixed','midline'};
 cnt=1;
@@ -22,11 +20,11 @@ for subf=1:length(subfs)
         otherwise
             append='';
     end
-        
+
    system(['gunzip ',subbase,'*.nii.gz']);
-   
+
    nuclei=dir([subbase,'*.nii']);
-   
+
    for nucleus=1:length(nuclei)
        ea_conformspaceto(spacefile,[subbase,nuclei(nucleus).name],1);
        [~,nuclname]=fileparts(nuclei(nucleus).name);
@@ -38,7 +36,7 @@ for subf=1:length(subfs)
        Avol(:,:,:,cnt)=nii.img;
        cnt=cnt+1;
    end
-    
+
 end
 
 Avol(isnan(Avol))=0;
@@ -46,16 +44,16 @@ Avol(Avol<0.5)=0;
 [~,Fvol]=max(Avol,[],4);
 lab=nii;
 lab.img=Fvol;
-lab.fname=[earoot,'templates',filesep,'labeling',filesep,atlasname,'.nii'];
+lab.fname=[ea_space([],'labeling'),atlasname,'.nii'];
 ea_write_nii(lab);
 
-f=fopen([earoot,'templates',filesep,'labeling',filesep,atlasname,'.txt'],'w');
+f=fopen([ea_space([],'labeling'),atlasname,'.txt'],'w');
 for nucl=1:length(Astr)
     fprintf(f,'%d %s\n',nucl,Astr{nucl});
 end
 fclose(f);
 
-rmdir([earoot,'atlases',filesep,atlasname,'_copy'],'s')
+rmdir([ea_space([],'atlases'),atlasname,'_copy'],'s')
 
 
 

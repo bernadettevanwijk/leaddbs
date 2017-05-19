@@ -10,13 +10,15 @@ if options.modality==1
         expdo=1:4;
     end
 else
-    expdo=1;
+    expdo=1:2;
         subdir=[options.root,options.patientname,filesep];
     if exist([subdir,'gl',options.prefs.fa2anat],'file');
-        expdo=[1,4];
+        expdo=[1,2,4];
     end
 end
+
 disp('Preparing images to show Normalization...');
+
 
 for export=expdo % if CT, only do 1, if MR, do 1:3.
 %     if strcmp(options.prefs.dev.profile,'se') 
@@ -32,11 +34,17 @@ for export=expdo % if CT, only do 1, if MR, do 1:3.
                 addstr='MNI space (wireframes) & Preoperative MRI';
                 suff='_pre_tra';
             case 2
-                checkf=[options.root,options.prefs.patientdir,filesep,options.prefs.gtranii,',1'];
-                checkfn=options.prefs.gtranii;
+                if options.modality==1
+                    checkf=[options.root,options.prefs.patientdir,filesep,options.prefs.gtranii,',1'];
+                    checkfn=options.prefs.gtranii;
+                                    suff='_tra';
+                elseif options.modality==2
+                    checkf=[options.root,options.prefs.patientdir,filesep,'tp_',options.prefs.gctnii,',1'];
+                    checkfn=['tp_',options.prefs.gctnii];
+                                    suff='_ct';
+                end
                 outf=['check_',options.prefs.tranii];
                 addstr='MNI space (wireframes) & Postoperative axial MRI';
-                suff='_tra';
             case 3
                 checkf=[options.root,options.prefs.patientdir,filesep,options.prefs.gcornii,',1'];
                 checkfn=options.prefs.gcornii;
@@ -52,7 +60,6 @@ for export=expdo % if CT, only do 1, if MR, do 1:3.
         end
 
 
-            mcr=ea_checkmacaque(options);
                 
             w=load([ea_space(options),'wires.mat']);
             pt=ea_load_nii(checkf);
@@ -79,7 +86,7 @@ for export=expdo % if CT, only do 1, if MR, do 1:3.
             w.wires=w.wires.*0.2;
             w.wires=w.wires+0.8;
             switch suff
-                case '_fa' % do no windowing for now.
+                case {'_fa','_ct'} % do no windowing for now.
                     mni_img=ea_load_nii([ea_space(options),'fa.nii']);
                     mni_img.img=(mni_img.img-min(mni_img.img(:)))/(max(mni_img.img(:))-min(mni_img.img(:)));
                 otherwise
@@ -95,7 +102,7 @@ for export=expdo % if CT, only do 1, if MR, do 1:3.
             %joint_im=0.5*wires.img+pt.img;
             joint_im=pt.img;
             if strcmp(options.prefs.dev.profile,'se') % do siobhan specific stuff (here don't show wires to enable any template to be used as normalization template)
-                ;
+                            joint_im=joint_im.*w.wires; %shows white wires, if commented out, normalizations are shown without the wires, useful if other templates than the MNI are used to normalize images to
             else
             joint_im=joint_im.*w.wires; %shows white wires, if commented out, normalizations are shown without the wires, useful if other templates than the MNI are used to normalize images to
             end
@@ -168,7 +175,7 @@ for export=expdo % if CT, only do 1, if MR, do 1:3.
 %       if strcmp(options.prefs.dev.profile,'se') 
 %         ;
 %       else
-        catch
+    catch
         fprintf('Skip showing normalization of %s\n', checkf);
     end
 

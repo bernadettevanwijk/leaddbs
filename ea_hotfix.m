@@ -16,7 +16,10 @@ updurl = 'http://www.lead-dbs.org/release/download.php';
 if hotfix
     try
         disp('*** Updating LEAD. Please do not quit MATLAB.');
-        mkdir([earoot,'tmp'])
+        ea_delete([earoot,'tmp',filesep,'hotfix']);
+        if ~exist([earoot,'tmp'] ,'dir')
+            mkdir([earoot,'tmp']);
+        end
         disp('Downloading hotfix...');
         try
             webopts=weboptions('Timeout',5);
@@ -61,12 +64,12 @@ if hotfix
 
         disp('Copying new code...');
         copyfile([earoot,'tmp',filesep,'hotfix',filesep,'*'],earoot,'f');
-        copyfile([earoot,'tmp',filesep,'hotfix',filesep,'.version.txt'],earoot,'f');
         disp('Cleaning up...');
         rmdir([earoot,'tmp'],'s')
         disp('Done.');
 
         disp('Restarting LEAD.');
+        close all force
         lead;
         success=1;
         disp('*** Update finished.');

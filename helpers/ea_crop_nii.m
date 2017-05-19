@@ -1,88 +1,109 @@
 function ea_crop_nii(varargin)
 % This function crops bounding-box of niftis to non-zeros or non-nan values.
-% usage: ea_crop_nii(filename, [prefix (default: overwrite, threshstring -
-% can be 'nn' for non-Nan or 'nz' for non-zero (default)]). Note that
-% outputs will not contain nan values anymore.
+% usage: ea_crop_nii(filename, [prefix (default: overwrite), threshstring -
+% can be 'nn' for non-Nan or 'nz' for non-zero (default), cleannan, interp]).
 % __________________________________________________________________________________
 % Copyright (C) 2015 Charite University Medicine Berlin, Movement Disorders Unit
 % Andreas Horn
 
-filename=varargin{1};
-if nargin>1
-    prefix=varargin{2};
+filename = varargin{1};
+
+if strcmp(filename(end-2:end), '.gz')
+    wasgz = 1;
+    gunzip(filename);
+    filename = filename(1:end-3);
 else
-    prefix='w';
+    wasgz = 0;
 end
 
-if nargin>2 % exclude nans/zeros
-    nstring=varargin{3};
+if nargin > 1
+    prefix = varargin{2};
 else
-    nstring='nz';
-end
-if nargin>3
-    cleannan=varargin{3};
-else
-    cleannan=0;
+    prefix = '';
 end
 
-V=spm_vol(filename);
+if isempty(prefix)
+    prefix = 'tmp';
+end
+
+if nargin > 2 % exclude nans/zeros
+    nstring = varargin{3};
+else
+    nstring = 'nz';
+end
+
+if nargin > 3
+    cleannan = varargin{4};
+else
+    cleannan = 0;
+end
+
+if nargin > 4
+    interp = varargin{5};
+else
+    interp = 0;
+end
+
+V = spm_vol(filename);
 
 [bb,vox] = ea_spm_get_bbox(V, nstring);
 
-bb=increasebb(bb);
+bb = increasebb(bb);
 
-diagentries=V.mat(logical(eye(4)));
-if any(vox<0) || any(diagentries<0)
+if any(vox<0) || any(V.mat(logical(eye(4)))<0) %Seems to be true for FSL but not other norm. methods: vox = -0.7 0.7 0.7
     ea_reslice_nii(filename,filename,abs(vox),0,[],2,[],[],0); % last zero is to not use SPM. this has shown to not work when voxel sizes are negative
-    V=spm_vol(filename);
-    [bb,vox] = ea_spm_get_bbox(V, nstring);
-    bb=increasebb(bb);
+    V = spm_vol(filename);
+    [bb, vox] = ea_spm_get_bbox(V, nstring);
+    bb = increasebb(bb);
 end
 
-
-dist=diff(bb); % check for weird zero bbs in small files.
+dist = diff(bb); % check for weird zero bbs in small files.
 
 if all(dist)
     
     % create sn structure:
-    sn.VG=V;
-    sn.VF=V;
-    sn.Affine=eye(4);
-    sn.Tr=[];
-    sn.flags=[];
+    sn.VG = V;
+    sn.VF = V;
+    sn.Affine = eye(4);
+    sn.Tr = [];
+    sn.flags = [];
     
     % create ropts structure:
-    ropts.preserve=0;
-    ropts.bb=bb;
-    ropts.vox=vox;
-    ropts.interp=0;
-    ropts.wrap=[0,0,0];
-    ropts.prefix=prefix;
+    ropts.preserve = 0;
+    ropts.bb = bb;
+    ropts.vox = vox;
+    ropts.interp = interp;
+    ropts.wrap = [0,0,0];
+    ropts.prefix = prefix;
     try
         spm_write_sn([filename,',1'], sn,ropts);
     catch % init SPM first
         spm_jobman('initcfg');
         spm_write_sn([filename,',1'], sn,ropts);
     end
-    if nargin<2
-        [pth,fname,ext]=fileparts(filename);
-        
-        movefile(fullfile(pth,['w',fname,ext]),fullfile(pth,[fname,ext]));
-    else
-        if strcmp(prefix,'w')
-            [pth,fname,ext]=fileparts(filename);
-            
-            movefile(fullfile(pth,[filesep,'w',fname,ext]),fullfile(pth,[filesep,fname,ext]));
-            
-        end
-    end
-    
 end
+
+[pth, fname, ext] = fileparts(filename);
+output = fullfile(pth,[prefix, fname, ext]);
+if strcmp(prefix, 'tmp')
+    movefile(output, filename);
+    output = filename;
+end
+
 if cleannan
-nii=ea_load_nii(fullfile(pth,[fname,ext]));
-nii.img(abs(nii.img)<0.01)=nan; % reduce noise in originally zero compartments.
-ea_write_nii(nii);
+    nii = ea_load_nii(output);
+    nii.img(abs(nii.img)<0.01) = nan; % reduce noise in originally zero compartments.
+    ea_write_nii(nii);
 end
+
+if wasgz
+    gzip(output);
+    delete(output);
+    if ~strcmp(prefix, 'tmp')  % delete unzipped file in non-overwrite mode
+        delete(filename);
+    end
+end
+
 
 function [BB,vx] = ea_spm_get_bbox(V, thr, premul)
 % Compute volume's bounding box, for full field of view or object bounds
@@ -202,7 +223,6 @@ end
 
 
 function bb=increasebb(bb)
-
 
 for dim=1:3
     dbb=bb(:,dim);

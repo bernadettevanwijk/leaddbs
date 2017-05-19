@@ -107,8 +107,10 @@ try
 catch
     options.atl.genpt=0;
 end
-if get(handles.vizspacepopup,'Value')==2 && strcmp(handles.atlassetpopup.String(handles.atlassetpopup.Value),'Use none')
-    options.atl.genpt=0;
+if isfield(handles,'vizspacepopup')
+    if get(handles.vizspacepopup,'Value')==2 && strcmp(handles.atlassetpopup.String(handles.atlassetpopup.Value),'Use none')
+        options.atl.genpt=0;
+    end
 end
 options.atl.normalize=0; % normalize patient specific atlasset. This is not done anymore for now.
 try
@@ -145,6 +147,13 @@ try
 catch
     options.manualheightcorrection=0;
 end
+
+try
+    options.scrf=get(handles.scrf,'Value');
+catch
+    options.scrf=0;
+end
+
 try
     options.d3.write=(get(handles.render_checkbox,'Value') == get(handles.render_checkbox,'Max'));
 catch
@@ -242,7 +251,8 @@ try
     if iscell(options.lcm.struc.connectome)
     options.lcm.struc.connectome=options.lcm.struc.connectome{get(handles.fiberspopup,'Value')};
     end
-    options.lcm.func.connectome=get(handles.fmripopup,'String');
+    options.lcm.func.connectome=strrep(get(handles.fmripopup,'String'),' > ','>');
+    
     if iscell(options.lcm.func.connectome)
     options.lcm.func.connectome=options.lcm.func.connectome{get(handles.fmripopup,'Value')};
     end

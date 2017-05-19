@@ -17,7 +17,7 @@ try
         specs.vox=dnii.voxsize;
         specs.affine=dnii.mat;
 
-        ea_ftr2trk(ftrfname,directory,specs,options); % export normalized ftr to .trk
+        ea_ftr2trk(ftrfname,directory,specs); % export normalized ftr to .trk
         disp('Done.');
 	end
 end
@@ -36,7 +36,7 @@ if vizz
     plot3(xx(1:10:end),yy(1:10:end),zz(1:10:end),'.','color',[0.9598    0.9218    0.0948]);
     axis vis3d off tight equal;
     hold on
-    
+
     % plot anat, voxel space
     anat=ea_load_nii(refanat);
     subplot(1,3,2);
@@ -45,7 +45,7 @@ if vizz
     plot3(xx(1:1000:end),yy(1:1000:end),zz(1:1000:end),'.','color',[0.9598    0.9218    0.0948]);
     axis vis3d off tight equal;
     hold on
-    
+
     % plot MNI, world space
     mni=ea_load_nii(refnorm);
     subplot(1,3,3);
@@ -78,6 +78,7 @@ display(sprintf('\nNormalizing fibers...'));
 
 %% map from b0 voxel space to anat mm and voxel space
 display(sprintf('\nMapping from b0 to anat...'));
+ea_coreg2images(options,refb0,refanat,[options.root,options.patientname,filesep,'tmp.nii'],{},1);
 [~, mov] = fileparts(options.prefs.b0);
 [~, fix] = fileparts(options.prefs.prenii_unnormalized);
 [~, wfibsvox_anat] = ea_map_coords(fibers(:,1:3)', ...
@@ -156,9 +157,22 @@ try
     specs.affine=dnii.mat;
 
     [~,ftrfname]=fileparts(options.prefs.FTR_normalized);
-    ea_ftr2trk(ftrfname,[directory,'connectomes',filesep,'dMRI',filesep],specs,options); % export normalized ftr to .trk
+    ea_ftr2trk(ftrfname,[directory,'connectomes',filesep,'dMRI',filesep],specs); % export normalized ftr to .trk
     disp('Done.');
 end
+
+
+
+
+%% add methods dump:
+cits={
+    'Horn, A., Ostwald, D., Reisert, M., & Blankenburg, F. (2014). The structural-functional connectome and the default mode network of the human brain. NeuroImage, 102 Pt 1, 142?151. http://doi.org/10.1016/j.neuroimage.2013.09.069'
+    'Horn, A., & Kühn, A. A. (2015). Lead-DBS: a toolbox for deep brain stimulation electrode localizations and visualizations. NeuroImage, 107, 127?135. http://doi.org/10.1016/j.neuroimage.2014.12.002'
+    'Horn, A., & Blankenburg, F. (2016). Toward a standardized structural-functional group connectome in MNI space. NeuroImage, 124(Pt A), 310?322. http://doi.org/10.1016/j.neuroimage.2015.08.048'
+    };
+ea_methods(options,['The whole-brain fiber set was normalized into standard-stereotactic space following the approach described in (Horn 2014, Horn 2016) as ',...
+    ' implemented in Lead-DBS software (Horn 2015; www.lead-dbs.org).'],...
+    cits);
 
 
 function [refb0,refanat,refnorm,whichnormmethod]=ea_checktransform(options)
@@ -176,5 +190,5 @@ refanat=[directory,options.prefs.prenii_unnormalized];
 
 % determin the template for fiber normalization and visualization
 if ismember(whichnormmethod,{'ea_normalize_spmshoot','ea_normalize_spmdartel','ea_normalize_spmnewseg'})
-	refnorm=[refnorm,',2'];  
+	refnorm=[refnorm,',2'];
 end

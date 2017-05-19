@@ -1,4 +1,4 @@
-function ea_firstrun(handles)
+function ea_firstrun(handles,options)
 
 % check if a newer version is available..
 local=ea_getvsn('local',1);
@@ -30,8 +30,6 @@ end
 %     end
 % end
 
-options=struct;
-options.prefs=ea_prefs(options);
 
 if ~isfield(options.prefs,'firstrun') % first run.
     fprintf(['Welcome to LEAD-DBS.\n \n',...
@@ -56,9 +54,9 @@ if ~isfield(options.prefs,'firstrun') % first run.
         'Any suggestions are more than welcome (andreas.horn@charite.de). \n'
         ]);
 
-    copyfile([ea_getearoot,'ea_prefs_default.m'],[ea_gethome,'.ea_prefs.m']);
+    copyfile([ea_getearoot,'common',filesep,'ea_prefs_default.m'],[ea_gethome,'.ea_prefs.m']);
     fid = fopen([ea_gethome,'.ea_prefs.m'],'a');
-    fwrite(fid,sprintf(['prefs.firstrun=','''','off','''','; \n']));
+    fprintf(fid, '\n\nprefs.firstrun=''off'';\n');
     fclose(fid);
 
 end

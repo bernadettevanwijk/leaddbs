@@ -52,18 +52,25 @@ function lead_OpeningFcn(hObject, eventdata, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to lead (see VARARGIN)
 
+%#ea_prefs_default.mat
+%#ea_prefs_default.m
+
+
 % Choose default command line output for lead
 handles.output = hObject;
 
 % Update handles structure
 guidata(hObject, handles);
- try
+ea_setpath;
+if isdeployed
+fprintf(1, '%s', ctfroot);
+end
+
     ea_compat_data; 
- end
 earoot=ea_getearoot;
 
-ea_setpath;
 ea_checkbuildspace;
+
 
 ea_checkspm;
 
@@ -102,6 +109,10 @@ if nargin>3
         case 'version'
             disp(ea_getvsn('local'));
             delete(handles.leadfigure)
+            return
+        case 'dir'
+            cd(ea_getearoot);
+             delete(handles.leadfigure)
             return
         case 'speak'
             fprintf('\n \n \n \n %s \n \n','L337-D8Z: "H3LLo 7o joO MY Phr13nd. l1V3 Lon9 4nd pRO5P3r."'); % yes, this indeed is an easter-egg.

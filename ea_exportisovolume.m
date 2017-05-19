@@ -13,6 +13,7 @@ if size(options.d3.isomatrix{1},2)==4-1 % 3 contact pairs
 elseif size(options.d3.isomatrix{1},2)==4 % 4 contacts
     shifthalfup=0;
 else
+    
     ea_error('Isomatrix has wrong size. Please specify a correct matrix.')
 end
 for side=1:length(options.sides)
@@ -22,17 +23,15 @@ for side=1:length(options.sides)
         for cont=1:size(options.d3.isomatrix{1},2)
             if ~isnan(options.d3.isomatrix{side}(sub,cont));
                 try
-                if ~shifthalfup
-                    X{side}(cnt)=elstruct(sub).coords_mm{side}(cont,1);
-                    Y{side}(cnt)=elstruct(sub).coords_mm{side}(cont,2);
-                    Z{side}(cnt)=elstruct(sub).coords_mm{side}(cont,3);
-                else % using pairs of electrode contacts (i.e. 3 pairs if there are 4 contacts)
-
+                    if ~shifthalfup
+                        X{side}(cnt)=elstruct(sub).coords_mm{side}(cont,1);
+                        Y{side}(cnt)=elstruct(sub).coords_mm{side}(cont,2);
+                        Z{side}(cnt)=elstruct(sub).coords_mm{side}(cont,3);
+                    else % using pairs of electrode contacts (i.e. 3 pairs if there are 4 contacts)
                         X{side}(cnt)=mean([elstruct(sub).coords_mm{side}(cont,1),elstruct(sub).coords_mm{side}(cont+1,1)]);
                         Y{side}(cnt)=mean([elstruct(sub).coords_mm{side}(cont,2),elstruct(sub).coords_mm{side}(cont+1,2)]);
                         Z{side}(cnt)=mean([elstruct(sub).coords_mm{side}(cont,3),elstruct(sub).coords_mm{side}(cont+1,3)]);
-
-                end
+                    end
                 V{side}(cnt)=options.d3.isomatrix{side}(sub,cont);
 
                 PT{side}(cnt)=sub;
@@ -49,7 +48,9 @@ for side=1:length(options.sides)
     Vol=spm_vol([ea_space(options),'bb.nii']);
     nii{side}=spm_read_vols(Vol);
     nii{side}(:)=nan;
+    
     XYZ=[X{side},Y{side},Z{side},ones(length(X{side}),1)]';
+    
     XYZ=Vol.mat\XYZ; % to voxel space.
     XYZ=(XYZ(1:3,:)');
     % repeat the above but in voxel space..
@@ -61,7 +62,8 @@ for side=1:length(options.sides)
     [XI,YI,ZI]=meshgrid([bb(1,1):bb(1,2)],[bb(2,1):bb(2,2)],[bb(3,1):bb(3,2)]);
     warning('off')
 
-    F = scatteredInterpolant(XYZ(:,1),XYZ(:,2),XYZ(:,3),double(V{side}),'natural');
+    nanix=~isnan(V{side});
+    F = scatteredInterpolant(XYZ(nanix,1),XYZ(nanix,2),XYZ(nanix,3),double(V{side}(nanix)),'natural');
     warning('on')
     F.ExtrapolationMethod='none';
 
@@ -70,10 +72,9 @@ for side=1:length(options.sides)
     xix{side}=bb(1,1):bb(1,2); yix{side}=bb(2,1):bb(2,2); zix{side}=bb(3,1):bb(3,2);
 
     nii{side}(xix{side},yix{side},zix{side})=F({xix{side},yix{side},zix{side}});
+    nii2{side}=nii{side};
 
-
-
-
+    
 
 
     switch side
@@ -98,7 +99,7 @@ for side=1:length(options.sides)
 
 
 
-    if side==2; % write out combined volume with separate interpolations for each side.
+    if side==2 % write out combined volume with separate interpolations for each side.
         %% old part
         Vol.fname=[options.root,options.patientname,filesep,options.d3.isomatrix_name,'_lr.nii'];
         niic=ea_nanmean(cat(4,nii{1},nii{2}),4);
@@ -115,11 +116,12 @@ for side=1:length(options.sides)
         matlabbatch{1}.spm.spatial.smooth.im = 1;
         matlabbatch{1}.spm.spatial.smooth.prefix = 's';
         jobs{1}=matlabbatch;
+        
         spm_jobman('run',jobs);
         clear jobs matlabbatch
         %% Also write out volume with combined information on both sides (symmetric image).
 
-        niic=ea_load_nii([ea_getearoot,'templates',filesep,'bb.nii']);
+        niic=ea_load_nii([ea_space,'bb.nii']);
         niic.dt=[16,1];
 
         %niic=spm_read_vols(Vol);
@@ -146,7 +148,9 @@ for side=1:length(options.sides)
 
             warning('off');
 
-            F = scatteredInterpolant(XYZ(:,1),XYZ(:,2),XYZ(:,3),double([V{1};V{2}]));% ,'natural');
+            nanix=[(~isnan(V{1}));(~isnan(V{2}))];
+            AllV=[V{1};V{2}];
+            F = scatteredInterpolant(XYZ(nanix,1),XYZ(nanix,2),XYZ(nanix,3),double(AllV(nanix)),'natural');
 
 
             F.ExtrapolationMethod='none';
@@ -166,7 +170,7 @@ for side=1:length(options.sides)
                 XYZV=[XYZ,[V{1};V{2}]];
                 PTb=[PT{1};PT{2}];
                 if inside==1
-                    significancemethod=5;
+                    significancemethod=0;
                     switch significancemethod
                         case 1 % estimate significance by estimating centrality
                             [ixes]=ea_centrality_significance(XYZV);
@@ -209,12 +213,12 @@ for side=1:length(options.sides)
                                 XYZV(:,4)=1;
                                 warning('off');
                                 Fsig = scatteredInterpolant(XYZV(:,1),XYZV(:,2),XYZV(:,3),XYZV(:,4));
-                                
+
                                 Fsig.ExtrapolationMethod='none';
                                 warning('on');
                                 niicsig(xixc,yixc,zixc)=Fsig({xixc,yixc,zixc});
                             end
-                            
+
                         case 5 % estimate significance by applying leave-one-out permutations on weighted distance (by value) from rest of data
                             [ixes,R,p]=ea_leoo_significance_weighteddist(XYZV);
                             ea_dumpsigtxt([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_leoo_sig_weighteddist.txt'],R,p);
@@ -224,11 +228,11 @@ for side=1:length(options.sides)
                                 XYZV(:,4)=1;
                                 warning('off');
                                 Fsig = scatteredInterpolant(XYZV(:,1),XYZV(:,2),XYZV(:,3),XYZV(:,4));
-                                
+
                                 Fsig.ExtrapolationMethod='none';
                                 warning('on');
-                                
-                                
+
+
                                 niicsig(xixc,yixc,zixc)=Fsig({xixc,yixc,zixc});
                             end
                     end
@@ -242,13 +246,8 @@ for side=1:length(options.sides)
         ea_write_nii(niic);
         %ea_crop_nii([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_combined.nii'],'','nn');
         % smooth image.
-        matlabbatch{1}.spm.spatial.smooth.data = {[options.root,options.patientname,filesep,options.d3.isomatrix_name,'_combined.nii,1']};
-        matlabbatch{1}.spm.spatial.smooth.fwhm = [1 1 1];
-        matlabbatch{1}.spm.spatial.smooth.dtype = 0;
-        matlabbatch{1}.spm.spatial.smooth.im = 1;
-        matlabbatch{1}.spm.spatial.smooth.prefix = 's';
-        jobs{1}=matlabbatch;
-        spm_jobman('run',jobs);
+
+        
         clear jobs matlabbatch
 
         %% write out significant volume:
@@ -259,14 +258,21 @@ for side=1:length(options.sides)
                 niic.img=niicsig;
                 ea_write_nii(niic);
                 ea_crop_nii([options.root,options.patientname,filesep,'s',options.d3.isomatrix_name,'_combined_p05.nii']);
-            end 
+            end
         end
 
-        ea_crop_nii([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_lr.nii'],'w','nz',1);
-        ea_crop_nii([options.root,options.patientname,filesep,'s',options.d3.isomatrix_name,'_lr.nii'],'w','nz',1);
-        ea_crop_nii([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_combined.nii'],'w','nz',1);
-        ea_crop_nii([options.root,options.patientname,filesep,'s',options.d3.isomatrix_name,'_combined.nii'],'w','nz',1);
+        ea_crop_nii([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_lr.nii'],'','nz',1,1);
+        ea_crop_nii([options.root,options.patientname,filesep,'s',options.d3.isomatrix_name,'_lr.nii'],'','nz',1,1);
+        ea_crop_nii([options.root,options.patientname,filesep,options.d3.isomatrix_name,'_combined.nii'],'','nz',1,1);
+
         
+        matlabbatch{1}.spm.spatial.smooth.data = {[options.root,options.patientname,filesep,options.d3.isomatrix_name,'_combined.nii,1']};
+        matlabbatch{1}.spm.spatial.smooth.fwhm = [1 1 1];
+        matlabbatch{1}.spm.spatial.smooth.dtype = 0;
+        matlabbatch{1}.spm.spatial.smooth.im = 1;
+        matlabbatch{1}.spm.spatial.smooth.prefix = 's';
+        jobs{1}=matlabbatch;
+        spm_jobman('run',jobs);
 
     end
 

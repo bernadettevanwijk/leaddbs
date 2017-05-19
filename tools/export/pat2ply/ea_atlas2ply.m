@@ -6,8 +6,8 @@ end
 cnt=1;
 earoot=ea_getearoot;
 for atl=1:length(atlasnames)
-    
-    load([earoot,'atlases',filesep,atlasnames{atl},filesep,'atlas_index.mat']);
+
+    load([ea_space([],'atlases'),atlasnames{atl},filesep,'atlas_index.mat']);
     for side=1:2
     for mesh=1:length(atlases.names)
         cfv(cnt).vertices=atlases.fv{mesh,side}.vertices;
@@ -25,4 +25,5 @@ cfv=ea_concatfv(cfv);
 
 
 cfv=ea_mapcolvert2ind(cfv);
+cfv.faces=[cfv.faces(:,2),cfv.faces(:,1),cfv.faces(:,3)];
 ea_patch2ply(ofn,cfv.vertices',cfv.faces',cfv.facevertexcdata');

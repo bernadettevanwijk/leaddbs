@@ -9,12 +9,14 @@ end
 
 % move T2 reference image
 try
-    movefile([ea_getearoot,'templates',filesep,'mni_hires.nii'],[ea_getearoot,'templates',filesep,'mni_hires_t2.nii']);
+    movefile([ea_getearoot,'templates',filesep,'mni_hires.nii'],[ea_space,'t2.nii']);
 end
 
 % move legacy ANTs warps
 if ismember(ea_whichnormmethod(directory),ea_getantsnormfuns)
-    ea_conv_antswarps(directory);
+    % commented for now. This seems not to work in all cases and lead to
+    % errors. People need to renormalize with ANTs instead.
+%    ea_conv_antswarps(directory);
 end
 
 % move normalized Fibertracts

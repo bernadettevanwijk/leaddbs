@@ -10,33 +10,57 @@ if ~exist('reco','var') % old format
     reco.props.elmodel=elmodel;
     reco.props.manually_corrected=manually_corrected;
 end
+
 [whichnormmethod,template]=ea_whichnormmethod(directory);
 nii=ea_load_nii(template);
+
 if ~ismember(whichnormmethod,ea_getantsnormfuns)
     try
         ea_checkforwardinv(options,'forward')
     end
 end
+
+
+if exist([options.root,options.patientname,filesep,'scrf',filesep,'scrf.mat'],'file')
+    usenative='scrf';
+else
+    usenative='native';
+end
+
+
+
+
+
+
+
 for side=1:length(options.sides)
     
+    reco.(usenative).coords_mm{side}=ea_warpcoord(reco.mni.coords_mm{side},nii,options);
+    reco.(usenative).markers(side).head=ea_warpcoord(reco.mni.markers(side).head,nii,options);
+    reco.(usenative).markers(side).tail=ea_warpcoord(reco.mni.markers(side).tail,nii,options);
+    reco.(usenative).trajectory{side}=ea_warpcoord(reco.mni.trajectory{side},nii,options);
     
-    reco.native.coords_mm{side}=ea_warpcoord(reco.mni.coords_mm{side},nii,options);
-    reco.native.markers(side).head=ea_warpcoord(reco.mni.markers(side).head,nii,options);
-    reco.native.markers(side).tail=ea_warpcoord(reco.mni.markers(side).tail,nii,options);
-    reco.native.trajectory{side}=ea_warpcoord(reco.mni.trajectory{side},nii,options);
-    
-    normtrajvector{side}=mean(diff(reco.native.trajectory{side}))/norm(mean(diff(reco.native.trajectory{side})));
+    normtrajvector{side}=mean(diff(reco.(usenative).trajectory{side}))/norm(mean(diff(reco.(usenative).trajectory{side})));
     orth=null(normtrajvector{side})*(options.elspec.lead_diameter/2);
     
+    reco.(usenative).markers(side).x=reco.(usenative).markers(side).head+orth(:,1)';
+    reco.(usenative).markers(side).y=reco.(usenative).markers(side).head+orth(:,2)'; % corresponding points in reality
     
-    reco.native.markers(side).x=reco.native.markers(side).head+orth(:,1)';
-    reco.native.markers(side).y=reco.native.markers(side).head+orth(:,2)'; % corresponding points in reality
-    
+end
+
+% apply scrf to native matrix if available
+if exist([options.root,options.patientname,filesep,'scrf',filesep,'scrf.mat'],'file')
+    load([options.root,options.patientname,filesep,'scrf',filesep,'scrf.mat'])
+    mat=inv(ea_antsmat2mat(AffineTransform_float_3_3,fixed));
+    reco.native=ea_applyscrfmat(mat,reco.scrf);
+else
+    if isfield(reco,'scrf')
+        reco=rmfield(reco,'scrf'); % delete subcortical transform if user apparently deleted the transform file.
+    end
 end
 
 
 save([directory,filesep,'ea_reconstruction.mat'],'reco');
-
 
 
 function c=ea_warpcoord(c,nii,options)

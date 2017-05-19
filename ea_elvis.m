@@ -28,7 +28,8 @@ end
 
 % Initialize figure
 
-resultfig=figure('name',[options.patientname,': Electrode-Scene'],'numbertitle','off','CloseRequestFcn',@closesattelites,'visible',options.d3.verbose,'KeyPressFcn',@ea_keypress,'KeyReleaseFcn',@ea_keyrelease);
+resultfig=figure('name',[options.patientname,': Electrode-Scene'],'color','k','numbertitle','off','CloseRequestFcn',@closesattelites,'visible',options.d3.verbose,'KeyPressFcn',@ea_keypress,'KeyReleaseFcn',@ea_keyrelease);
+setappdata(resultfig,'options',options);
 set(resultfig,'toolbar','none');
 ssz=get(0,'Screensize');
 ssz(1:2)=ssz(1:2)+50;
@@ -55,7 +56,6 @@ fh3 = uimenu(mh,'Label','Show tracts weighted by activation map','Callback',{@ea
 set(resultfig,'Renderer','opengl')
 axis off
 %set(gca,'DrawMode','fast')
-set(resultfig,'color','w');
 set(resultfig, 'InvertHardCopy', 'off');
 %set(resultfig,'visible','off');
 set(resultfig,'Clipping','off');
@@ -68,6 +68,10 @@ set(gcf,'Name',[figtitle,'...building...']);
 axis equal
 axis fill
 
+colormap('gray')
+
+
+
 %% Patient specific part (skipped if no patient is selected or no reco available):
 if ~strcmp(options.patientname,'No Patient Selected') % if not initialize empty viewer
     if exist([options.root,options.patientname,filesep,'ea_reconstruction.mat'],'file') || nargin>1;
@@ -77,11 +81,12 @@ if ~strcmp(options.patientname,'No Patient Selected') % if not initialize empty 
             
             if options.d3.mirrorsides
                elstruct=ea_mirrorsides(elstruct); 
+               options.d3.isomatrix=ea_mirrorsides(options.d3.isomatrix);
             end
             
         else
             multiplemode=0;
-
+            options.loadrecoforviz=1; % add flag to load scrf entry if in native mode.
             [coords_mm,trajectory,markers]=ea_load_reconstruction(options);
 
             elstruct(1).coords_mm=coords_mm;
@@ -97,7 +102,7 @@ if ~strcmp(options.patientname,'No Patient Selected') % if not initialize empty 
             try
                 [el_render(pt).el_render,el_label(:,pt)]=ea_showelectrode(resultfig,elstruct(pt),pt,options);
             catch
-                ea_error(['Couldn''''t visualize electrode from patient ',num2str(pt),'.']);
+                ea_error(['Couldn''t visualize electrode from patient ',num2str(pt),'.']);
             end
             if options.d3.elrendering==1 % export vizstruct for lateron export to JSON file / Brainbrowser.
                % this part for brainbrowser support.
@@ -182,10 +187,16 @@ else
     elstruct=struct;
 end
 
+
+
 % Initialize Sliceview-Button
 
 slicebutton=uipushtool(ht,'CData',ea_get_icn('slices',options),'TooltipString','Slice Control Figure','ClickedCallback',{@opensliceviewer,resultfig,options});
 
+if options.prefs.env.dev;
+% Initialize MER-Button
+merbutton=uipushtool(ht,'CData',ea_get_icn('mer',options),'TooltipString','MER Control Figure','ClickedCallback',{@openmerviewer,resultfig,options});
+end
 % Initialize Convis-Button
 convisbutton=uipushtool(ht,'CData',ea_get_icn('connectome',options),'TooltipString','Connectivity Visualization','ClickedCallback',{@openconnectomeviewer,resultfig,options});
 
@@ -197,7 +208,12 @@ corticalbutton=uipushtool(ht,'CData',ea_get_icn('cortex',options),'TooltipString
 
 % Show atlas data
 if options.d3.writeatlases
-    atlases=ea_showatlas(resultfig,elstruct,options);
+    [atlases,colorbuttons,atlassurfs]=ea_showatlas(resultfig,elstruct,options);
+    
+    %if length(atlases.names)>6 % only open up for long atlas lists by default.
+    ea_openatlascontrol([],[],atlases,resultfig,options);
+    %end
+
     if options.d3.elrendering==1 % export vizstruct for lateron export to JSON file / Brainbrowser.
         try % see if electrode has been defined.
         cnt=length(vizstruct);
@@ -231,10 +247,7 @@ if options.d3.showisovolume
         options.d3.isomatrix=allisomatrices{reg};
         options.d3.isomatrix_name=allisonames{reg};
         
-        
-        if options.d3.mirrorsides
-           options.d3.isomatrix=ea_mirrorsides(options.d3.isomatrix); 
-        end
+
         ea_showisovolume(resultfig,elstruct,options);
     end
 end
@@ -251,24 +264,30 @@ end
 
 % Initialize a draggable lightbulb
 hold on
-[resultfig]=ea_show_light(resultfig);
-%set(lightbulb, 'Visible', 'off');
+ea_show_light(resultfig,1);
+% set(lightbulb, 'Visible', 'off');
 
-lightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('lightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(gcf,'cam_lamp')},'OffCallback',{@objinvisible,getappdata(gcf,'cam_lamp')},'State','on');
-clightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('clightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(gcf,'ceiling_lamp')},'OffCallback',{@objinvisible,getappdata(gcf,'ceiling_lamp')},'State','on');
-llightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('llightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(gcf,'right_lamp')},'OffCallback',{@objinvisible,getappdata(gcf,'right_lamp')},'State','on');
-rlightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('rlightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(gcf,'left_lamp')},'OffCallback',{@objinvisible,getappdata(gcf,'left_lamp')},'State','on');
+lightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('lightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(resultfig,'cam_lamp')},'OffCallback',{@objinvisible,getappdata(resultfig,'cam_lamp')},'State','on');
+clightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('clightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(resultfig,'ceiling_lamp')},'OffCallback',{@objinvisible,getappdata(resultfig,'ceiling_lamp')},'State','on');
+llightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('llightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(resultfig,'left_lamp')},'OffCallback',{@objinvisible,getappdata(resultfig,'left_lamp')},'State','on');
+rlightbulbbutton=uitoggletool(ht,'CData',ea_get_icn('rlightbulb',options),'TooltipString','Lightbulb','OnCallback',{@objvisible,getappdata(resultfig,'right_lamp')},'OffCallback',{@objinvisible,getappdata(resultfig,'right_lamp')},'State','on');
 
 
 % Initialize HD-Export button
 
 hdsavebutton=uipushtool(ht,'CData',ea_get_icn('save',options),'TooltipString','Save Scene','ClickedCallback',@export_hd);
+dofsavebutton=uipushtool(ht,'CData',ea_get_icn('save_depth',options),'TooltipString','Save Scene with depth of field','ClickedCallback',{@ea_export_depth_of_field,resultfig});
+
 
 % Initialize Video-Export button
 
 videoexportbutton=uipushtool(ht,'CData',ea_get_icn('video',options),'TooltipString','Save video','ClickedCallback',{@export_video,options});
 
 
+% Init hard_electrode_view button
+if options.modality==2
+electrodesegmentbutton=uitoggletool(ht,'CData',ea_get_icn('electrode_segment',options),'TooltipString','Auto-Segment electrode from postoperative acquisition','OnCallback',{@ea_segment_electrode,options,resultfig,'on'},'OffCallback',{@ea_segment_electrode,options,resultfig,'off'},'State','off');
+end
 % Initialize Export to Lead-Server button
 
 lsbutton=uipushtool(ht,'CData',ea_get_icn('server',options),'TooltipString','Export to Server','ClickedCallback',{@ea_export_server,options});
@@ -277,38 +296,42 @@ hold off
 
 set(0,'CurrentFigure',resultfig);
 
-set(gcf,'Renderer','OpenGL')
+set(resultfig,'Renderer','OpenGL')
 axis off
-set(gcf,'color','w');
+set(resultfig,'color','k');
+
 axis vis3d
 axis equal
 set(resultfig,'Name',figtitle);
 set(0,'CurrentFigure',resultfig);
-ax=gca;
-set(ax,'XLim',[-140 140]);
-set(ax,'YLim',[-140 140]);
-set(ax,'ZLim',[-140 140]);
-zoom(3)
-ax=gca;
-set(ax,'XLim',[-140 140]);
-set(ax,'YLim',[-140 140]);
-set(ax,'ZLim',[-140 140]);
-set(ax,'XLimMode','manual'); set(ax,'YLimMode','manual'); set(ax,'ZLimMode','manual');
-view(133,56);
-zoom(6)
+ax=resultfig.CurrentAxes;
+set(ax,'XLimMode','auto');
+set(ax,'YLimMode','auto');
+set(ax,'ZLimMode','auto');
+
+% set(ax,'XLim',[-140 140]);
+% set(ax,'YLim',[-140 140]);
+% set(ax,'ZLim',[-140 140]);
+% zoom(3)
+% ax=gca;
+% set(ax,'XLim',[-140 140]);
+% set(ax,'YLim',[-140 140]);
+% set(ax,'ZLim',[-140 140]);
+view(142,13.6)
+zoom(1.5)
 %set(resultfig,'visible','on');
 opensliceviewer([],[],resultfig,options);
-
 if options.d3.elrendering==1 % export vizstruct for lateron export to JSON file / Brainbrowser.
-try
-    % store json in figure file
-    bbstruct=ea_viz2brainbrowser(vizstruct);
-    setappdata(resultfig,'bbstruct',bbstruct);
-end
+    try
+        % store json in figure file
+        bbstruct=ea_viz2brainbrowser(vizstruct);
+        setappdata(resultfig,'bbstruct',bbstruct);
+    end
     if options.prefs.ls.autosave
         ea_export_server([],[],options);
     end
 end
+setappdata(resultfig,'elstruct',elstruct);
 
 
 function opensliceviewer(hobj,ev,resultfig,options)
@@ -316,11 +339,10 @@ awin=ea_anatomycontrol(resultfig,options);
 setappdata(resultfig,'awin',awin);
 try WinOnTop(awin,true); end
 
-
 function openconnectomeviewer(hobj,ev,resultfig,options)
-awin=ea_convis(gcf,options);
-setappdata(resultfig,'awin',awin);
-try WinOnTop(awin,true); end
+conwin=ea_convis(gcf,options);
+setappdata(resultfig,'conwin',conwin);
+try WinOnTop(conwin,true); end
 
 
 function openstimviewer(hobj,ev,elstruct,resultfig,options)
@@ -328,11 +350,14 @@ stimwin=ea_stimparams(elstruct,gcf,options);
 setappdata(resultfig,'stimwin',stimwin);
 try WinOnTop(stimwin,true); end
 
+function openmerviewer(hobj,ev,resultfig,options)
+merwin=ea_mercontrol(resultfig,options);
+setappdata(resultfig,'merwin',merwin);
+try WinOnTop(merwin,true); end
 
 function opencortexviewer(hobj,ev,resultfig,options)
-showcortex=ea_showcortex(resultfig,options);
-setappdata(resultfig,'showcortex',showcortex);
-try WinOnTop(showcortex,true); end
+cortex=ea_showcortex(resultfig,options);
+setappdata(resultfig,'cortex',cortex);
 % reload slice viewer to update opacity control
 awin=ea_anatomycontrol(resultfig,options);
 setappdata(resultfig,'awin',awin);
@@ -348,6 +373,18 @@ end
 awin=getappdata(gcf,'awin');
 try
     close(awin)
+end
+aswin=getappdata(gcf,'aswin');
+try
+    close(aswin)
+end
+conwin=getappdata(gcf,'conwin');
+try
+    close(conwin)
+end
+merwin=getappdata(gcf,'merwin');
+try
+    close(merwin)
 end
 delete(gcf)
 
@@ -427,10 +464,133 @@ end
 function ea_keypress(resultfig,event)
 % this is the main keypress function for the resultfigure. Add event
 % listeners here.
-
 if ismember('alt',event.Modifier)
-    setappdata(resultfig,'altpressed',1);
+     setappdata(resultfig,'altpressed',1);
 %    disp('Altpressed');
+elseif ismember('shift',event.Modifier)
+     setappdata(resultfig,'shiftpressed',1);
+end
+
+try
+    merwin = getappdata(resultfig,'merwin');
+    options = getappdata(merwin,'options');
+    %merstruct = getappdata(resultfig,'merstruct');
+    merhandles = getappdata(resultfig,'merhandles');
+    mermarkers = getappdata(resultfig,'mermarkers');
+    keymer = getappdata(resultfig,'keymer');
+catch
+    merwin=[];
+end
+if ~isempty(merwin) && isvalid(merwin)
+    commnd=event.Key; % event.Character;
+    sphere = load([options.earoot,'helpers',filesep,'sphere.mat']);
+    n = length(mermarkers);
+    sSize = 0.5;
+    % CData = parula; CData = repmat(CData(1:length(sphere.x),:),[1 size(sphere.x,2)/3]);
+    % colormap = repmat([1 1 0],[size(sphere.x,1) size(sphere.x,2)/3]);
+    % tmp = parula;
+    % colormap = repmat(tmp(end:-2:1,:),[4 1]); clear tmp
+    %colormap = [1 1 0; 0 0 1];
+    
+    if isempty(keymer)
+        return
+    elseif sum(double(~cellfun(@isempty,strfind({'space','m','l','t','b','s','n'},event.Key))))>0
+        trajectory = [get(merhandles.(keymer(4:end)),'XData')',get(merhandles.(keymer(4:end)),'YData')',get(merhandles.(keymer(4:end)),'ZData')'];
+        if n>0 && isequal(trajectory(1,:),mermarkers(n).coords_mm) && ~strcmp(event.Key,'s') && ~strcmp(event.Key,'n')
+            fprintf('Location along %s %s tract already marked: [%f,%f,%f].\n',keymer(strfind(keymer,'_')+1:end),keymer(4:strfind(keymer,'_')-1),trajectory(1,:))
+            return
+        end
+    end   
+    
+    if sum(double(~cellfun(@isempty,strfind({'space','m','l','t','b','s','n'},event.Key))))>0
+        sphere.x = sphere.x*sSize+trajectory(1,1);
+        sphere.y = sphere.y*sSize+trajectory(1,2);
+        sphere.z = sphere.z*sSize+trajectory(1,3);
+        mermarkers(n+1).side = keymer(regexp(keymer,'_')+1:end);
+        mermarkers(n+1).tract = keymer(4:regexp(keymer,'_')-1);
+        mermarkers(n+1).depth = str2double(getfield(getfield(getappdata(merwin,'UsedByGUIData_m'),['pos' keymer(4:end)]),'String'));
+        mermarkers(n+1).coords_mm = trajectory(1,:);
+        mermarkers(n+1).dat.implantedtract = getfield(getfield(getappdata(merwin,'UsedByGUIData_m'),['popupimplantedtract' keymer(regexp(keymer,'_'):end)]),'String');
+        mermarkers(n+1).dat.implantedtract = mermarkers(n+1).dat.implantedtract{getfield(getfield(getappdata(merwin,'UsedByGUIData_m'),['popupimplantedtract' keymer(regexp(keymer,'_'):end)]),'Value')};
+        mermarkers(n+1).dat.leaddepth = str2double(getfield(getfield(getappdata(merwin,'UsedByGUIData_m'),['editimplanteddepth' keymer(regexp(keymer,'_'):end)]),'String'));
+        mermarkers(n+1).dat.offset = event.Key;
+        mermarkers(n+1).dat.key = event.Key;
+        mermarkers(n+1).tag.depth = getfield(getfield(getappdata(merwin,'UsedByGUIData_m'),['pos' keymer(4:end)]),'String');
+        mermarkers(n+1).tag.visible = options.prefs.mer.tag.visible;
+        [mermarkers(n+1).tag.handle,mermarkers(n+1).tag.string] = ea_setmertag(mermarkers(n+1).tag,keymer,trajectory(1,:));
+
+        % Reserved keys: {'space','m','l','t','b','s','n'}
+        % 'space' = Generic; 'm' = MER; 'l' = LFP; 't' = Top; 'b' = Bottom
+        switch lower(commnd)
+            case 'space'
+                mermarkers(n+1).notes;
+                mermarkers(n+1).handle = surf(sphere.x,sphere.y,sphere.z,...
+                    'FaceColor',[0.5 0.5 0],'EdgeColor','none',...
+                    'FaceAlpha',0.7,'tag','Generic');
+                mermarkers(n+1).markertype = 'Generic';
+            case 'm'
+                mermarkers(n+1).handle = surf(sphere.x,sphere.y,sphere.z,...
+                    'FaceColor',[0.5 0 0],'EdgeColor','none',...
+                    'FaceAlpha',0.7,'tag','MER');
+                mermarkers(n+1).markertype = 'MER recording';
+                mermarkers(n+1).session = char(inputdlg('Enter Session'));
+            case 'l'
+                mermarkers(n+1).handle = surf(sphere.x,sphere.y,sphere.z,...
+                    'FaceColor',[0 0.5 0],'EdgeColor','none',...
+                    'FaceAlpha',0.7,'tag','LFP');
+                mermarkers(n+1).markertype = 'LFP recording';
+                mermarkers(n+1).session = char(inputdlg('Enter Session'));
+            case 't'
+                mermarkers(n+1).handle = surf(sphere.x,sphere.y,sphere.z,...
+                    'FaceColor',[0 0 0.5],'EdgeColor','none',...
+                    'FaceAlpha',0.7,'tag','Top');
+                mermarkers(n+1).markertype = 'Top border';
+            case 'b'
+                mermarkers(n+1).handle = surf(sphere.x,sphere.y,sphere.z,...
+                    'FaceColor',[0 0 0.5],'EdgeColor','none',...
+                    'FaceAlpha',0.7,'tag','Bottom');
+                mermarkers(n+1).markertype = 'Bottom border';
+            case 's'
+                mermarkers(n).session = char(inputdlg('Enter Session'));
+            case 'n'
+                mermarkers(n).notes = char(inputdlg('Enter Notes'));
+        end
+
+        setappdata(resultfig,'mermarkers',mermarkers);
+        ea_updatemercontrol(keymer,getappdata(merwin,'UsedByGUIData_m'),mermarkers,resultfig,options)
+   
+    else
+        switch commnd
+            case {'uparrow','leftarrow'}
+            if isempty(keymer); return
+            else
+              trajectory = [merhandles.(keymer(4:end)).XData',merhandles.(keymer(4:end)).YData',merhandles.(keymer(4:end)).ZData'];            
+            end
+            if isempty(event.Modifier) || ~ismember(event.Modifier,{'shift','alt'})
+                d=0.25; % step size
+            elseif ismember(event.Modifier,'shift')
+                d=0.75;    % large step
+            elseif ismember(event.Modifier,'alt')
+                d=0.05;    % small step size
+            end
+            newtrajectory = ea_getmertrajectory(trajectory,d,options.prefs.mer.length,50);
+            ea_updatemertrajectory(getappdata(merwin,'UsedByGUIData_m'),newtrajectory,d,keymer(4:end))
+        case {'downarrow','rightarrow'}
+            if isempty(keymer); return
+            else
+              trajectory = [merhandles.(keymer(4:end)).XData',merhandles.(keymer(4:end)).YData',merhandles.(keymer(4:end)).ZData'];
+            end
+            if isempty(event.Modifier) || ~ismember(event.Modifier,{'shift','alt'})
+                d=-0.25; % movement distance
+            elseif ismember(event.Modifier,'shift')
+                d=-0.75; % large step
+            elseif ismember(event.Modifier,'alt')
+                d=-0.05;
+            end
+            newtrajectory = ea_getmertrajectory(trajectory,d,options.prefs.mer.length,50);
+            ea_updatemertrajectory(getappdata(merwin,'UsedByGUIData_m'),newtrajectory,d,keymer(4:end))
+        end
+    end
 end
 % commnd=event.Character;
 % switch lower(commnd)
@@ -789,3 +949,67 @@ h=zoom;
 h.Enable=cmd;
 h.Motion='both';
 h.Direction='out';
+
+function [handle,string] = ea_setmertag(tag,keymer,trajectory)
+% tag.string; tag.visible; tag.color;
+d = 3.2;
+pos = [trajectory(1,1)/abs(trajectory(1,1))*d+trajectory(1,1),trajectory(1,2:3)];
+% string = sprintf('%s%s Depth: %smm',upper(keymer(4)),keymer(5:strfind(keymer,'_')-1),tag.depth);
+string = sprintf('%s%s: %smm',upper(keymer(4)),keymer(5:strfind(keymer,'_')-1),tag.depth);
+handle = text(pos(1),pos(2),pos(3),string,'Color','w','HorizontalAlignment','center','Visible',tag.visible);
+
+
+function ea_updatemercontrol(keymer,handles,mermarkers,resultfig,options)
+n=length(mermarkers);
+markerstring.right = get(handles.popupmermarkers_right,'String');
+markerstring.left = get(handles.popupmermarkers_left,'String');
+
+if isempty(markerstring.right)
+    markerstring.right = {'none selected...'};
+end
+
+if isempty(markerstring.left)
+    markerstring.left = {'none selected...'};
+end
+
+if strcmp(keymer(strfind(keymer,'_')+1:end),'right')
+    % side = 1;
+    markerstring.right{end+1} = sprintf('%0.0f. %s',n,mermarkers(n).tag.string);
+elseif strcmp(keymer(strfind(keymer,'_')+1:end),'left')
+    % side = 2;
+    markerstring.left{end+1} = sprintf('%0.0f. %s',n,mermarkers(n).tag.string);
+end
+
+setappdata(resultfig,'markerstring',markerstring)
+set(handles.popupmermarkers_right,'Visible','off','String',markerstring.right,'Value',1)
+set(handles.popupmermarkers_left,'Visible','off','String',markerstring.left,'Value',1)
+% set(handles.togglemarkertags,'Visible','on','Value',1)
+
+function outputtrajectory = ea_getmertrajectory(trajectory,dist,length,n)
+if size(trajectory,1)<2
+    error('Must input a vector')
+end
+dxyz = sqrt((diff(trajectory(1:2,1))^2)+(diff(trajectory(1:2,2))^2)+diff(trajectory(1:2,3))^2);
+slope = mean(diff(trajectory))/dxyz;
+startpoint = trajectory(1,:)+slope.*dist;
+
+outputtrajectory(:,1) = linspace(startpoint(1,1),startpoint(1,1)+slope(1)*length,n);
+outputtrajectory(:,2) = linspace(startpoint(1,2),startpoint(1,2)+slope(2)*length,n);
+outputtrajectory(:,3) = linspace(startpoint(1,3),startpoint(1,3)+slope(3)*length,n);
+
+
+function ea_updatemertrajectory(handles,trajectory,dist,tag) 
+resultfig=getappdata(handles.mercontrolfig,'resultfig');
+% Update position in resultfig
+% XData = get(getappdata(resultfig,tag),'XData');
+% YData = get(getappdata(resultfig,tag),'YData');
+% ZData = get(getappdata(resultfig,tag),'ZData');
+h = getfield(getappdata(resultfig,'merhandles'),tag);
+set(h,'XData',trajectory(:,1)')
+set(h,'YData',trajectory(:,2)')
+set(h,'ZData',trajectory(:,3)')
+setappdata(resultfig,tag,h)
+set(handles.(['key',tag]),'Value',1)
+setappdata(resultfig,'keymer',['key',tag])
+newdiststr = num2str(str2double(get(handles.(['pos',tag]),'String'))+dist);
+set(handles.(['pos',tag]),'String',newdiststr)

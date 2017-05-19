@@ -41,14 +41,16 @@ end
 
 ea_dcm2niix(indir, outdir);
 
-if options.prefs.dicom.dicomfiles % delete DICOM folder
+% delete DICOM folder
+if options.prefs.dicom.dicomfiles
     rmdir(indir,'s');
 end
 
 % remove uncropped and untilted versions
-fclean = ea_regexpdir(outdir,'(_Crop_1.nii|_Tilt_1)\.nii$',0);
+fclean = ea_regexpdir(outdir, '(_Crop_1|_Tilt_1)\.nii$', 0);
+fclean = unique(regexprep(fclean, '(_Crop_1|_Tilt_1)', ''));
 for f=1:length(fclean)
-    delete(fclean{f});
+    ea_delete(fclean{f});
 end
 
 if options.prefs.dicom.assign
@@ -59,3 +61,11 @@ if options.prefs.dicom.assign
         ea_imageclassifier({dcfilename});
     end
 end
+
+
+%% add methods dump:
+
+ea_methods(options,['DICOM images were converted to the NIfTI file format, cropped and reoriented to standard NIfTI orientation using dcm2niiX software (e.g. see https://www.nitrc.org/projects/dcm2nii/).']);
+
+
+

@@ -21,7 +21,6 @@ end
 
 % create structural CM
 if options.lc.struc.compute_CM
-
     if ~exist([options.root,options.patientname,filesep,'connectomics'],'dir')
         mkdir([options.root,options.patientname,filesep,'connectomics']);
     end
@@ -91,8 +90,9 @@ if options.lc.func.compute_CM
 
 end % end connectivity matrix section
 if options.lc.func.compute_GM || options.lc.func.compute_CM
-disp(['*** Done analyzing ' num2str(options.prefs.n_rest) ' rs-fMRI files...']);
+    disp(['*** Done analyzing ' num2str(options.prefs.n_rest) ' rs-fMRI files...']);
 end
+
 % graph metrics section below:
 % for multiple file support: need to edit `ea_computeGM`
 if options.lc.func.compute_GM || options.lc.struc.compute_GM % perform graph metrics
@@ -107,7 +107,7 @@ if options.lc.func.compute_GM || options.lc.struc.compute_GM % perform graph met
     modes=cell(0);
     finas=cell(0);
     threshs=cell(0);
-    fs=[]; % functional/structural measure (for structure-function agreement
+    fs=[]; % functional/structural measure (for structure-function similarity)
     if options.lc.func.compute_GM
         for irest = 1:options.prefs.n_rest
             modes{end+1}='fMRI';

@@ -68,7 +68,7 @@ guidata(hObject, handles);
 options.earoot=ea_getearoot;
 options.prefs=ea_prefs('');
 setappdata(handles.leadfigure,'earoot',options.earoot);
-as=dir([options.earoot,'atlases',filesep]);
+as=dir([ea_space(options,'atlases')]);
 asc=cell(0);
 cnt=1;
 for i=1:length(as)
@@ -186,7 +186,7 @@ setappdata(gcf,'M',M);
 ea_refresh_lg(handles);
 
 handles.prod='group';
-ea_firstrun(handles);
+ea_firstrun(handles,options);
 
 ea_menu_initmenu(handles,{'prefs','transfer'});
 
@@ -242,7 +242,7 @@ function addptbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 M=getappdata(handles.leadfigure,'M');
 
-folders=ea_uigetdir('/','Select Patient folders..');
+folders=ea_uigetdir(ea_startpath,'Select Patient folders..');
 M.patient.list=[M.patient.list;folders'];
 M.patient.group=[M.patient.group;ones(length(folders),1)];
 
@@ -358,7 +358,7 @@ try
     end
 end
 options.groupmode=1;
-
+options.patient_list=M.patient.list;
 resultfig=ea_elvis(options,M.elstruct(get(handles.patientlist,'Value')));
 
 ea_busyaction('off',handles.leadfigure,'group');
@@ -600,7 +600,7 @@ function [pathname] = ea_uigetdir(start_path, dialog_title)
 
 import javax.swing.JFileChooser;
 
-if nargin == 0 || strcmp(start_path,'') || start_path == 0 % Allow a null argument.
+if nargin == 0 || strcmp(start_path,'') % || start_path == 0 % Allow a null argument.
     start_path = pwd;
 end
 
@@ -956,7 +956,7 @@ switch mod
         fibersfile=mod;
     case 'Do not calculate connectivity stats'
     otherwise % load fibertracts once and for all subs here.
-        [fibersfile.fibers,fibersfile.fibersidx]=ea_loadfibertracts([ea_getconnectomebase('dmri'),mod,'.mat']);
+        [fibersfile.fibers,fibersfile.fibersidx]=ea_loadfibertracts([ea_getconnectomebase('dmri'),mod,filesep,'data.mat']);
 end
 
 [selection]=ea_groupselectorwholelist(M.ui.listselect,M.patient.list);
@@ -1000,7 +1000,7 @@ for pt=selection
     options.d3.hlactivecontacts=get(handles.highlightactivecontcheck,'Value');
     options.d3.showactivecontacts=get(handles.showactivecontcheck,'Value');
     options.d3.showpassivecontacts=get(handles.showpassivecontcheck,'Value');
-    try 
+    try
         options.d3.isomatrix=M.isomatrix;
     catch
         options.d3.isomatrix={};
@@ -1091,7 +1091,11 @@ for pt=selection
         for side=1:2
             setappdata(resultfig,'elstruct',M.elstruct(pt));
             setappdata(resultfig,'elspec',options.elspec);
-            [stimparams(1,side).VAT(1).VAT,volume]=feval(ea_genvat,M.elstruct(pt).coords_mm,M.S(pt),side,options,'gs',0.2,handles.leadfigure);
+ %           try
+                [stimparams(1,side).VAT(1).VAT,volume]=feval(ea_genvat,M.elstruct(pt).coords_mm,M.S(pt),side,options,'gs',0.2,handles.leadfigure);
+%            catch
+%                ea_error(['Error while creating VTA of ',M.patient.list{pt},'.']);
+%            end
             stimparams(1,side).volume=volume;
         end
 
@@ -1127,7 +1131,7 @@ for pt=selection
         end
     end
     close(resultfig);
-    
+
 
     if processlocal % gather stats and recos to M
         load([M.ui.groupdir,options.patientname,filesep,'ea_stats']);
@@ -1729,11 +1733,11 @@ options.d3.elrendering=M.ui.elrendering;
 options.d3.hlactivecontacts=get(handles.highlightactivecontcheck,'Value');
 options.d3.showactivecontacts=get(handles.showactivecontcheck,'Value');
 options.d3.showpassivecontacts=get(handles.showpassivecontcheck,'Value');
-try options.d3.isomatrix=M.isomatrix; 
+try options.d3.isomatrix=M.isomatrix;
 catch
     options.d3.isomatrix={};
 end
-try options.d3.isomatrix_name=M.isomatrix_name; 
+try options.d3.isomatrix_name=M.isomatrix_name;
 catch
     options.d3.isomatrix_name={};
 end
@@ -1776,9 +1780,13 @@ if options.d3.showisovolume || options.expstatvat.do % regressors be used ? iter
         options.d3.isomatrix_name=allisonames{reg};
         M.isomatrix=allisomatrices{reg};
         M.isomatrix_name=allisonames{reg};
-        
-        try options.d3.isomatrix=ea_reformat_isomatrix(options.d3.isomatrix,M,options); end
-        
+        options.shifthalfup=0;
+        try options.d3.isomatrix=ea_reformat_isomatrix(options.d3.isomatrix,M,options);
+        if size(options.d3.isomatrix{1},2)==3 % pairs
+        options.shifthalfup=1;
+        end
+        end
+
         if ~strcmp(get(handles.groupdir_choosebox,'String'),'Choose Group Directory') % group dir still not chosen
             ea_refresh_lg(handles);
             disp('Saving data...');
@@ -1786,7 +1794,7 @@ if options.d3.showisovolume || options.expstatvat.do % regressors be used ? iter
             save([get(handles.groupdir_choosebox,'String'),'LEAD_groupanalysis.mat'],'M','-v7.3');
             disp('Done.');
         end
-        
+
         % export coordinate-mapping
         if options.d3.showisovolume % export to nifti volume
             ea_exportisovolume(M.elstruct(get(handles.patientlist,'Value')),options);
@@ -1795,7 +1803,7 @@ if options.d3.showisovolume || options.expstatvat.do % regressors be used ? iter
         if options.expstatvat.do % export to nifti volume
             ea_exportvatmapping(M,options,handles);
         end
-        
+
         ea_out2d(M,options,handles);
     end
 else
@@ -1989,7 +1997,10 @@ function specify2doptions_Callback(hObject, eventdata, handles)
 % hObject    handle to specify2doptions (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-ea_spec2dwrite;
+options.prefs=ea_prefs('');
+options.groupmode=1;
+options.native=0;
+ea_spec2dwrite(options);
 
 
 % --- Executes on button press in calcgroupconnectome.
@@ -2315,3 +2326,10 @@ function mirrorsides_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of mirrorsides
+
+M=getappdata(gcf,'M');
+M.ui.mirrorsides=get(handles.mirrorsides,'Value');
+
+
+setappdata(gcf,'M',M);
+ea_refresh_lg(handles);

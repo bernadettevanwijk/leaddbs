@@ -68,7 +68,7 @@ ea_initrecentpatients(handles);
 
 ea_processguiargs(handles,varargin)
 
-ea_menu_initmenu(handles,{'cluster','prefs','transfer'});
+ea_menu_initmenu(handles,{'cluster','prefs','transfer','vats'});
 
 
 [mdl,sf]=ea_genmodlist;
@@ -178,7 +178,7 @@ load([earoot,'ea_recentpatients.mat']);
 p=fileparts(fullrpts{1});
 end
 
-[seeds,path]=uigetfile({'*.txt';'*.nii.gz';'*.nii'},'Please choose seed definition(s)...','MultiSelect','on');
+[seeds,path]=uigetfile({'*.nii','NIfTI';'*.txt','Text';'*.nii.gz','NIfTI'},'Please choose seed definition(s)...','MultiSelect','on');
 
 if iscell(seeds)
     set(hObject,'String',['Multiple (',num2str(length(seeds)),')']);
@@ -342,7 +342,8 @@ function patdir_choosebox_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 ea_busyaction('on',handles.leadfigure,'mapper');
-ea_getpatients(handles);
+options.prefs=ea_prefs('');
+ea_getpatients(options,handles);
 
 ea_busyaction('off',handles.leadfigure,'mapper');
 

@@ -199,7 +199,7 @@ for side=1:length(options.sides)
         elrender{side}(cnt)=patch(p);
         cnt=cnt+1;
     end
-    
+
 
 
 
@@ -356,7 +356,7 @@ if vizz
         end
         specsurf(elrender{side}(cnt),usecolor,aData);
         cnt=cnt+1;
-        
+
     end
     for con=1:length(electrode.contacts)
 
@@ -367,7 +367,7 @@ if vizz
         specsurf(elrender{side}(cnt),elspec.contact_color,aData);
 
         cnt=cnt+1;
-        
+
     end
 
     axis equal

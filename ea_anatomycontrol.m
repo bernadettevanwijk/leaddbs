@@ -22,7 +22,7 @@ function varargout = ea_anatomycontrol(varargin)
 
 % Edit the above text to modify the response to help ea_anatomycontrol
 
-% Last Modified by GUIDE v2.5 10-Jan-2017 18:34:38
+% Last Modified by GUIDE v2.5 19-Feb-2017 19:22:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -57,6 +57,7 @@ set(hObject,'Name','Anatomy Slices');
 % Choose default command line output for ea_anatomycontrol
 handles.output = hObject;
 
+
 % Update handles structure
 guidata(hObject, handles);
 
@@ -70,6 +71,25 @@ togglestates=getappdata(resultfig,'togglestates'); % get info from resultfig.
 setappdata(hObject,'togglestates',togglestates); % store anatomy toggle data from resultfig to anatomyslice (this) fig for subroutines.
 set(handles.acontrolfig,'Visible',options.d3.verbose);
 
+ht=getappdata(handles.acontrolfig,'toolbar');
+if isempty(ht)
+    ht=uitoolbar(handles.acontrolfig);
+    c_step=2;
+    minuscontrast=uipushtool(ht,'CData',ea_get_icn('contrastminus',options),'TooltipString','Decrease Contrast','ClickedCallback',{@setslidecontrast,'c',-0.1,resultfig,handles});
+    pluscontrast=uipushtool(ht,'CData',ea_get_icn('contrastplus',options),'TooltipString','Increase Contrast','ClickedCallback',{@setslidecontrast,'c',0.1,resultfig,handles});
+    minusoffset=uipushtool(ht,'CData',ea_get_icn('extleft',options),'TooltipString','Decrease Offset','ClickedCallback',{@setslidecontrast,'o',-0.1,resultfig,handles});
+    plusoffset=uipushtool(ht,'CData',ea_get_icn('extright',options),'TooltipString','Increase Offset','ClickedCallback',{@setslidecontrast,'o',0.1,resultfig,handles});
+    setappdata(handles.acontrolfig,'toolbar',ht);
+end
+
+
+
+spacedef=ea_getspacedef;
+if isfield(spacedef,'guidef')
+    set(handles.xval,'String',num2str(spacedef.guidef.xyzdef(1)));
+    set(handles.yval,'String',num2str(spacedef.guidef.xyzdef(2)));
+    set(handles.zval,'String',num2str(spacedef.guidef.xyzdef(3)));
+end
 
 if ~isfield(options,'native')
     options.native=0;
@@ -81,58 +101,53 @@ set(handles.templatepopup,'String',list);
 appdata = getappdata(resultfig);
 if ~isfield(appdata,'showcortex')
     set(handles.cortexalpha,'Visible','off')
-elseif isfield(getappdata(resultfig),'showcortex')
+elseif isfield(getappdata(resultfig),'cortex')
     set(handles.cortexalpha,'Visible','on')
     set(handles.cortexalpha,'String',num2str(appdata.showcortex.FaceAlpha))
 end
 clear appdata
 
 if ~isempty(togglestates) % anatomy toggles have been used before..
-% reset figure handle.
+    % reset figure handle.
 
-% xyz values
-set(handles.xval,'String',num2str(togglestates.xyzmm(1)));
-set(handles.yval,'String',num2str(togglestates.xyzmm(2)));
-set(handles.zval,'String',num2str(togglestates.xyzmm(3)));
-% toggle buttons
-set(handles.xtoggle,'Value',togglestates.xyztoggles(1));
-set(handles.ytoggle,'Value',togglestates.xyztoggles(2));
-set(handles.ztoggle,'Value',togglestates.xyztoggles(3));
-% transparencies
-set(handles.xtrans,'String',num2str(togglestates.xyztransparencies(1)));
-set(handles.ytrans,'String',num2str(togglestates.xyztransparencies(2)));
-set(handles.ztrans,'String',num2str(togglestates.xyztransparencies(3)));
+    % xyz values
+    set(handles.xval,'String',num2str(togglestates.xyzmm(1)));
+    set(handles.yval,'String',num2str(togglestates.xyzmm(2)));
+    set(handles.zval,'String',num2str(togglestates.xyzmm(3)));
+    % toggle buttons
+    set(handles.xtoggle,'Value',togglestates.xyztoggles(1));
+    set(handles.ytoggle,'Value',togglestates.xyztoggles(2));
+    set(handles.ztoggle,'Value',togglestates.xyztoggles(3));
+    % transparencies
+    set(handles.xtrans,'String',num2str(togglestates.xyztransparencies(1)));
+    set(handles.ytrans,'String',num2str(togglestates.xyztransparencies(2)));
+    set(handles.ztrans,'String',num2str(togglestates.xyztransparencies(3)));
 
-% template name
-set(handles.templatepopup,'Value',find(ismember(get(handles.templatepopup,'String'),togglestates.template)));
+    % template name
+    set(handles.templatepopup,'Value',find(ismember(get(handles.templatepopup,'String'),togglestates.template)));
 
-% invertcheck
-set(handles.invertcheck,'Value',togglestates.tinvert);
-
-% cut items.
-switch togglestates.cutview
-    case '3d'
-        set(handles.threedradio,'Value',1);
-    case 'xcut'
-        set(handles.xcutradio,'Value',1);
-    case 'ycut'
-        set(handles.ycutradio,'Value',1);
-    case 'zcut'
-        set(handles.zcutradio,'Value',1);
-end
+    % cut items.
+    %     switch togglestates.cutview
+    %         case '3d'
+    %             set(handles.threedradio,'Value',1);
+    %         case 'xcut'
+    %             set(handles.xcutradio,'Value',1);
+    %         case 'ycut'
+    %             set(handles.ycutradio,'Value',1);
+    %         case 'zcut'
+    %             set(handles.zcutradio,'Value',1);
+    %     end
 else
     togglestates.cutview='3d';
     togglestates.refreshcuts=1;
-
-setappdata(getappdata(handles.acontrolfig,'resultfig'),'togglestates',togglestates);
+    setappdata(getappdata(handles.acontrolfig,'resultfig'),'togglestates',togglestates);
 end
 
 pos=get(hObject,'position');
 set(hObject,'position',[0,0,pos(3),pos(4)]);
 refreshresultfig(handles)
-
-
-
+view(142,13.6)
+set(handles.acontrolfig,'Visible',options.d3.verbose);
 
 
 
@@ -156,12 +171,18 @@ function templatepopup_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns templatepopup contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from templatepopup
+resultfig=getappdata(handles.acontrolfig,'resultfig');
+togglestates = getappdata(resultfig,'togglestates');
+handles.threedradio.Value = 1;
+togglestates.cutview = '3d';
+togglestates.refreshcuts = 1;
+setappdata(resultfig,'togglestates',togglestates);
+
 popvals=get(hObject,'String');
 if strcmp(popvals{get(hObject,'Value')},'Choose...')
     [FileName,PathName,FilterIndex] = uigetfile('*.nii','Choose anatomical image...');
     setappdata(gcf,'customfile',[PathName,FileName]);
 end
-    
 refreshresultfig(handles)
 
 % --- Executes during object creation, after setting all properties.
@@ -208,7 +229,8 @@ function xval_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of xval as text
 %        str2double(get(hObject,'String')) returns contents of xval as a double
 
-refreshresultfig(handles)
+refreshresultfig(handles,1)
+
 
 % --- Executes during object creation, after setting all properties.
 function xval_CreateFcn(hObject, eventdata, handles)
@@ -231,7 +253,8 @@ function yval_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of yval as text
 %        str2double(get(hObject,'String')) returns contents of yval as a double
-refreshresultfig(handles)
+refreshresultfig(handles,1)
+
 
 % --- Executes during object creation, after setting all properties.
 function yval_CreateFcn(hObject, eventdata, handles)
@@ -254,7 +277,8 @@ function zval_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of zval as text
 %        str2double(get(hObject,'String')) returns contents of zval as a double
-refreshresultfig(handles)
+
+refreshresultfig(handles,1)
 
 % --- Executes during object creation, after setting all properties.
 function zval_CreateFcn(hObject, eventdata, handles)
@@ -351,19 +375,26 @@ function invertcheck_Callback(hObject, eventdata, handles)
 refreshresultfig(handles)
 
 
-function refreshresultfig(handles)
+function refreshresultfig(handles,refresh)
 % this part makes changes of the figure active:
 
 
 resultfig=getappdata(handles.acontrolfig,'resultfig');
 try
-togglestates=getappdata(resultfig,'togglestates');
+    togglestates=getappdata(resultfig,'togglestates');
 catch
     resultfig=gcf;
-togglestates=getappdata(handles.acontrolfig,'togglestates');
+    togglestates=getappdata(handles.acontrolfig,'togglestates');
 end
 if ~isfield(togglestates,'refreshcuts')
     togglestates.refreshcuts=0;
+end
+
+if exist('refresh','var')
+    togglestates.refreshview=refresh;
+elseif isfield(togglestates,'refreshview')    
+else
+    togglestates.refreshview=0;
 end
 
 % reset states based on gui:
@@ -372,44 +403,49 @@ togglestates.xyztoggles=[get(handles.xtoggle,'Value'),get(handles.ytoggle,'Value
 togglestates.xyztransparencies=[str2double(get(handles.xtrans,'String')),str2double(get(handles.ytrans,'String')),str2double(get(handles.ztrans,'String'))];
 togglestates.template=get(handles.templatepopup,'String');
 togglestates.template=togglestates.template{get(handles.templatepopup,'Value')};
-togglestates.tinvert=get(handles.invertcheck,'Value');
+togglestates.tinvert=0;
 togglestates.customfile=getappdata(gcf,'customfile');
 setappdata(getappdata(handles.acontrolfig,'resultfig'),'togglestates',togglestates); % also store toggle data in resultfig.
 
 ea_anatomyslices(getappdata(handles.acontrolfig,'resultfig'),...
     togglestates,...
-    getappdata(handles.acontrolfig,'options'));
+    getappdata(handles.acontrolfig,'options'),handles);
 
-switch togglestates.cutview
-    case 'xcut'
-        set(0,'CurrentFigure',resultfig);
-                [az,el]=view;
-        if ~(az==90 && el==0)  || togglestates.refreshcuts          
-            axis([str2double(get(handles.xval,'String'))-1 str2double(get(handles.xval,'String'))+1 -130 100 -70 100])
-            view(90,0);
-        end
-    case 'ycut'
-        set(0,'CurrentFigure',resultfig);
-                [az,el]=view;
-        if ~(az==0 && el==0) || togglestates.refreshcuts
-            axis([-100 100 str2double(get(handles.yval,'String'))-1 str2double(get(handles.yval,'String'))+1 -70 100])
-            view(0,0);
-        end
-    case 'zcut'
-        set(0,'CurrentFigure',resultfig);
-        [az,el]=view;
-        if ~(az==0 && el==90) || togglestates.refreshcuts
-            axis([-100 100 -130 100 str2double(get(handles.zval,'String'))-1,str2double(get(handles.zval,'String'))+1])
-            view(0,90);
-        end
-    case '3d'
-        set(0,'CurrentFigure',resultfig);
-        if togglestates.refreshcuts; axis([-100 100 -130 100 -70 100]); end
-        
+nativemni = ea_getnativemni;
+if togglestates.refreshcuts && nativemni==1
+    axis([-100 100 -130 100 -70 100]);
+elseif togglestates.refreshcuts && nativemni==2
+    axis([-200 200 -50 250 -100 150]);
 end
 
 togglestates.refreshcuts=0;
+togglestates.refreshview=0;
 setappdata(resultfig,'togglestates',togglestates);
+% fprintf('Figure updated\n')
+
+
+
+
+function setslidecontrast(~,~,contrastoffset,posneg,resultfig,handles)
+sc=getappdata(resultfig,'slidecontrast');
+if isempty(sc)
+    sc.c=0;
+    sc.o=0;
+end
+switch contrastoffset
+    case 'c' % contrast
+        sc.c=sc.c+posneg;
+    case 'o' % offset
+        sc.o=sc.o+posneg;
+end
+setappdata(resultfig,'slidecontrast',sc);
+
+
+togglestates = getappdata(resultfig,'togglestates');
+togglestates.refreshview = 1;
+setappdata(resultfig,'togglestates',togglestates);
+
+refreshresultfig(handles,1);
 
 
 % --------------------------------------------------------------------
@@ -459,20 +495,20 @@ togglestates=getappdata(getappdata(gcf,'resultfig'),'togglestates');
 switch eventdata.NewValue
     case handles.xcutradio
         togglestates.cutview='xcut';
-        if eventdata.OldValue==handles.threedradio; togglestates.refreshcuts=1; end
+        if eventdata.OldValue==handles.threedradio; end %togglestates.refreshcuts=1; end
             
     case handles.ycutradio
         togglestates.cutview='ycut';
-        if eventdata.OldValue==handles.threedradio; togglestates.refreshcuts=1; end
+        if eventdata.OldValue==handles.threedradio; end %togglestates.refreshcuts=1; end
         
     case handles.zcutradio
         togglestates.cutview='zcut';
-        if eventdata.OldValue==handles.threedradio; togglestates.refreshcuts=1; end
+        if eventdata.OldValue==handles.threedradio; end %togglestates.refreshcuts=1; end
         
     case handles.threedradio
         
         togglestates.cutview='3d';
-        togglestates.refreshcuts=1;
+        % togglestates.refreshcuts=1;
         
 end
 setappdata(getappdata(gcf,'resultfig'),'togglestates',togglestates);
@@ -523,8 +559,50 @@ function cortexalpha_CreateFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
-set(hObject,'Value')
 % Hint: slider controls usually have a light gray background.
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+% --- Executes on selection change in slicepopup.
+function slicepopup_Callback(hObject, eventdata, handles)
+% hObject    handle to slicepopup (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns slicepopup contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from slicepopup
+resultfig = getappdata(handles.acontrolfig,'resultfig');
+V=getappdata(resultfig,'V');
+xyzmm=[str2double(get(handles.xval,'String')),str2double(get(handles.yval,'String')),str2double(get(handles.zval,'String'))];
+
+if get(hObject,'Value')==1 && strcmp(eventdata.EventName,'Action')
+    % switch from index to mm
+    xyzmm = V{1}.mat * [xyzmm';1];
+    set(handles.xval,'String',num2str(xyzmm(1)))
+    set(handles.yval,'String',num2str(xyzmm(2)))
+    set(handles.zval,'String',num2str(xyzmm(3)))
+    
+elseif get(handles.slicepopup,'Value')==2 && strcmp(eventdata.EventName,'Action')
+    % switch from mm to index
+    xyzmm=V{1}.mat \ [xyzmm';1];
+    set(handles.xval,'String',num2str(xyzmm(1)))
+    set(handles.yval,'String',num2str(xyzmm(2)))
+    set(handles.zval,'String',num2str(xyzmm(3)))
+    
+end
+refreshresultfig(handles,1)
+
+
+% --- Executes during object creation, after setting all properties.
+function slicepopup_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to slicepopup (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
 end

@@ -89,7 +89,7 @@ matlabbatch{1}.spm.tools.shoot.warp1.templates = {[ea_space(options,'dartel'),'s
     [ea_space(options,'dartel'),'shootmni_4.nii']
     [ea_space(options,'dartel'),'shootmni_5.nii']
     [ea_space(options,'dartel'),'shootmni_6.nii']};
-  jobs{1}=matlabbatch;                                            
+  jobs{1}=matlabbatch;
 
 
 spm_jobman('run',jobs);
@@ -117,7 +117,7 @@ clear matlabbatch jobs;
 %         matlabbatch{1}.spm.util.defs.out{1}.savedef.savedir.saveusr = {directory};
 % end
 % jobs{1}=matlabbatch;
-% 
+%
 % spm_jobman('run',jobs);
 % disp('*** Exported normalization parameters to y_ea_normparams.nii');
 % clear matlabbatch jobs;
@@ -137,3 +137,23 @@ clear matlabbatch jobs;
 % delete([directory,'u_rc1',options.prefs.prenii_unnormalized]);
 
 ea_apply_normalization(options)
+
+%% add methods dump:
+[scit,lcit]=ea_getspacedefcit;
+cits={
+    'Ashburner, J., & Friston, K. J. (2005). Unified segmentation., 26(3), 839?851. http://doi.org/10.1016/j.neuroimage.2005.02.018'
+    'Ashburner, J., & Friston, K. J. (2011). Diffeomorphic registration using geodesic shooting and Gauss?Newton optimisation. NeuroImage, 55(3), 954?967. http://doi.org/10.1016/j.neuroimage.2010.12.049'
+    'Horn, A., & Kühn, A. A. (2015). Lead-DBS: a toolbox for deep brain stimulation electrode localizations and visualizations. NeuroImage, 107, 127?135. http://doi.org/10.1016/j.neuroimage.2014.12.002'
+    };
+if ~isempty(lcit)
+    cits=[cits;{lcit}];
+end
+[~,anatpresent]=ea_assignpretra(options);
+
+ea_methods(options,['Pre- (and post-) operative acquisitions were spatially normalized into ',ea_getspace,' space ',scit,' based on preoperative acquisition(s) (',ea_cell2strlist(anatpresent),') using a'...
+    ' diffeomorphic registration algorithm using geodesic shooting and Gauss-Neuwton optimisation (SHOOT) as implemented in ',spm('ver'),' (Ashburner 2011; www.fil.ion.ucl.ac.uk/spm/software/).',...
+    ' SHOOT registration was performed by directly registering tissue segmentations of preoperative acquisitions (obtained using the unified Segmentation approach as implemented in ',spm('ver'),' (Ashburner 2005)',...
+    ' to a SHOOT template created from tissue priors defined by the MNI (ICBM 152 Nonlinear asymmetric 2009b atlas; http://nist.mni.mcgill.ca/?p=904)',...
+    ' supplied within Lead-DBS software (Horn 2015; www.lead-dbs.org).',...
+    ],...
+    cits);

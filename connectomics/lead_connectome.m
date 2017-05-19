@@ -134,11 +134,11 @@ if isindependent
     %% add tools menu
     ea_processguiargs(handles,varargin)
 
-    ea_menu_initmenu(handles,{'export','cluster','prefs','transfer','space'});
+    ea_menu_initmenu(handles,{'export','cluster','prefs','transfer','space','methods'});
     
 end
 
-ea_firstrun(handles);
+ea_firstrun(handles,options);
 
 % Choose default command line output for leadfigure
 handles.output = hObject;
@@ -158,7 +158,7 @@ set(handles.runsavebutn,'String','Save and close');
 set(handles.exportcode,'visible','off');
 
 set(handles.openpatientdir,'visible','off');
-moveup=136;
+moveup=165;
 
 pos=get(handles.logoaxes,'Position');
 pos(2)=pos(2)-moveup;
@@ -273,20 +273,21 @@ function runsavebutn_Callback(hObject, eventdata, handles)
 
 % check wether this is run or save (independent or dependent mode)
 
+cfig=handles.leadfigure;
+options=ea_handles2options(handles);
+isindependent=getappdata(handles.leadfigure,'isindependent');
+options.uipatdirs=getappdata(cfig,'uipatdir');
 ea_savelcopts(handles)
 
 % run execution:
 
-cfig=handles.leadfigure;
 ea_busyaction('on',cfig,'connectome');
 
 
-options=ea_handles2options(handles);
-options.macaquemodus=0;
-options.uipatdirs=getappdata(handles.leadfigure,'uipatdir');
 
+if isindependent
 ea_run('run',options);
-
+end
 ea_busyaction('off',cfig,'connectome');
 
 
@@ -563,7 +564,8 @@ function patdir_choosebox_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 ea_busyaction('on',handles.leadfigure,'connectome');
-ea_getpatients(handles);
+options.prefs=ea_prefs('');
+ea_getpatients(options,handles);
 ea_busyaction('off',handles.leadfigure,'connectome');
 
 % --- Executes on selection change in recentpts.

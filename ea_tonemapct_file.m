@@ -2,6 +2,10 @@ function ea_tonemapct_file(options,nativemni)
 ea_dispt('Tonemapping CT...');
 if ~exist('nativemni','var')
     nativemni='native';
+else
+    if isempty(nativemni)
+            nativemni='native';
+    end
 end
 switch nativemni
     case 'native'

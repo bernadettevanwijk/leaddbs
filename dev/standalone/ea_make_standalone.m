@@ -5,6 +5,77 @@ function ea_make_standalone(outdir)
 % This will generate a standalone program, which can be run
 % outside MATLAB, and therefore does not use up a MATLAB licence.
 %
+%% Lead part...
+close all
+lead % set paths
+close all
+outdir = fullfile(ea_getearoot,'../lead_standalone');
+mkdir(outdir);
+%% make a copy of required lead DBS folders:
+tof=[ea_getearoot,'standalone_export',filesep,ea_getstdaloneoname,filesep];
+
+if exist(fileparts(fileparts(tof)),'dir')
+    rmdir(fileparts(fileparts(tof)),'s');
+end
+mkdir(tof);
+from=ea_getearoot;
+copyfile([from,'*.m'],tof);
+copyfile([from,'*.fig'],tof);
+movefile([tof,'lead.m'],[fileparts(fileparts(tof)),filesep,'lead.m']);
+movefile([tof,'lead.fig'],[fileparts(fileparts(tof)),filesep,'lead.fig']);
+
+% helpers
+copyfile([from,'helpers'],[tof,'helpers']);
+% ext. libs
+copyfile([from,'ext_libs'],[tof,'ext_libs']);
+delete([tof,'ext_libs',filesep,'*.c']);
+delete([tof,'ext_libs',filesep,'*.cpp']);
+delete([tof,'ext_libs',filesep,'*/*.c']);
+delete([tof,'ext_libs',filesep,'*/*.cpp']);
+delete([tof,'ext_libs',filesep,'*/*/*.c']);
+delete([tof,'ext_libs',filesep,'*/*/*.cpp']);
+delete([tof,'ext_libs',filesep,'*/*/*/*.c']);
+delete([tof,'ext_libs',filesep,'*/*/*/*.cpp']);
+% connectomics
+copyfile([from,'connectomics'],[tof,'connectomics']);
+
+% icons
+copyfile([from,'icons'],[tof,'icons']);
+
+% vatmodel
+copyfile([from,'vatmodel'],[tof,'vatmodel']);
+
+% tools
+copyfile([from,'tools'],[tof,'tools']);
+
+% templates
+mkdir([tof,'templates',filesep,'space',filesep]);
+copyfile([from,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM'],[tof,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM']);
+rmdir([tof,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM',filesep,'atlases'],'s');
+mkdir([tof,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM',filesep,'atlases']);
+copyfile([from,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM',filesep,'atlases',filesep,'DISTAL (Ewert 2016)'],[tof,'templates',filesep,'space',filesep,'MNI_ICBM_2009b_NLIN_ASYM',filesep,'atlases',filesep,'DISTAL (Ewert 2016)']);
+copyfile([from,'templates',filesep,'electrode_contacts'],[tof,'templates',filesep,'electrode_contacts']);
+copyfile([from,'templates',filesep,'electrode_models'],[tof,'templates',filesep,'electrode_models']);
+
+delete([tof,'common',filesep,'ea_recentpatients.mat']);
+
+rmpath(genpath(from));
+addpath(genpath(tof));
+cd(tof);
+
+% for now delete some ext_libs that are not needed:
+rmdir([tof,'ext_libs',filesep,'surfice'],'s');
+rmdir([tof,'ext_libs',filesep,'dsi_studio'],'s');
+
+
+
+
+%% SPM part...
+spm fmri
+close all
+
+
+
 %__________________________________________________________________________
 
 %--------------------------------------------------------------------------
@@ -13,8 +84,8 @@ if exist('startup','file')
     warning('A startup.m has been detected in %s.\n',...
         fileparts(which('startup')));
 end
+try rmdir(fullfile(ea_getearoot,'../../lead_standalone'),'s'); end
 
-if ~nargin, outdir = fullfile(ea_getearoot,'lead_standalone'); mkdir(outdir); end
 
 %==========================================================================
 %-Static listing of SPM toolboxes
@@ -72,12 +143,12 @@ if ~sts, warning('Copy of Contents.m failed.'); end
 %==========================================================================
 opts = {'-p',fullfile(matlabroot,'toolbox','signal')};
 mcc('-m', '-C', '-v',...
-    '-o','Lead_DBS',...
+    '-o',ea_getstdaloneoname,...
     '-d',outdir,...
     '-N',opts{:},...
     '-R','-singleCompThread',...
-    '-a',[ea_getearoot,'templates'],...
-    '-a',[ea_getconnectomebase('dmri')],...
-    '-a',[ea_getearoot,'ext_libs'],...
-    '-a',[ea_getearoot,'atlases',filesep,'DISTAL_manual'],...
+    '-a',fileparts(ea_getearoot),...
     'lead.m');
+rmpath(genpath(tof));
+rmdir(tof,'s');
+addpath(from);

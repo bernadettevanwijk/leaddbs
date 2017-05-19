@@ -22,7 +22,7 @@ function varargout = lead_dbs(varargin)
 
 % Edit the above text to modify the response to help lead_dbs
 
-% Last Modified by GUIDE v2.5 10-Jan-2017 00:06:47
+% Last Modified by GUIDE v2.5 04-Mar-2017 11:43:18
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -70,44 +70,25 @@ set(handles.vizspacepopup,'String',{[ea_sub2space(ea_getspace), ' Space'];'Nativ
 ea_dispbn;
 
 mstr='';
-macaquemodus=0;
 set(handles.leadfigure,'name','Welcome to LEAD-DBS');
 
-if nargin
-    try
-    if strcmp('macaque',varargin{1})
-        options.earoot=earoot;
-        [mstr,isinstalled]=ea_checkmacaque(options,'installed?');
-        if isinstalled
-            macaquemodus=1;
-            mstr=['toolbox',filesep,'macaque',filesep];
-            disp('*** Macaque modus');
-            set(handles.leadfigure,'name','Welcome to LEAD-DBS ** Macaque modus **');
-            set(handles.targetpopup,'Enable','off');
-            set(handles.targetpopup,'Value',3);
-        else
-            ea_error('Please install Lead-DBS macaque toolbox prior to starting Lead-DBS in macaque mode.');
-        end
-    end
-    end
+spacedef=ea_getspacedef;
+if isfield(spacedef,'guidef')
+    set(handles.targetpopup,'String',[spacedef.guidef.entrypoints,{'Manual'}]);
+    
 end
 
-setappdata(handles.leadfigure,'macaquemodus',macaquemodus);
+options.prefs=ea_prefs('');
+
 ea_init_coregmrpopup(handles,1);
 
 % load atlassets
-ea_listatlassets(handles,1);
+ea_listatlassets(options,handles,1);
 
 set(handles.normalize_checkbox,'Value',0);
 
 set(hObject,'Color',[1 1 1]);
 set(handles.versiontxt,'String',['v',ea_getvsn('local')]);
-
-
-
-
-
-
 
 %im = imread('bg_gui.png');
 %image(im);
@@ -116,11 +97,8 @@ set(handles.versiontxt,'String',['v',ea_getvsn('local')]);
 
 %set(0,'gca',handles.logoaxes);
 set(0,'CurrentFigure',handles.leadfigure);
-if macaquemodus
-    im=imread([earoot,'icons',filesep,'logo_lead_dbs_macaque.png']);
-else
     im=imread([earoot,'icons',filesep,'logo_lead_dbs.png']);
-end
+
 image(im);
 axis off;
 axis equal;
@@ -130,8 +108,6 @@ set(handles.electrode_model_popup,'String',ea_resolve_elspec);
 
 % add norm methods to menu
 options.earoot=ea_getearoot;
-options.prefs=ea_prefs('');
-
 ea_addnormmethods(handles,options,mstr);
 
 % add coreg methods to menu
@@ -169,7 +145,7 @@ ea_processguiargs(handles,varargin)
 
 
 %% add tools menu
-ea_menu_initmenu(handles,{'acpc','export','applynorm','cluster','prefs','vatcon','transfer','checkregfigs','space'});
+ea_menu_initmenu(handles,{'acpc','export','applynorm','dbs','cluster','prefs','vatcon','transfer','checkregfigs','space','surfice','methods'});
 
 
 
@@ -177,12 +153,7 @@ ea_menu_initmenu(handles,{'acpc','export','applynorm','cluster','prefs','vatcon'
 
 
 handles.prod='dbs';
-if ~isempty(varargin)
-    if strcmp('macaque',varargin{1})
-        handles.prod='macaque';
-    end
-end
-ea_firstrun(handles);
+ea_firstrun(handles,options);
 ea_getui(handles);
 
 
@@ -213,7 +184,6 @@ ea_busyaction('on',leadfigure,'dbs');
 
 
 options=ea_handles2options(handles);
-options.macaquemodus=getappdata(handles.leadfigure,'macaquemodus');
 
 options.uipatdirs=getappdata(handles.leadfigure,'uipatdir');
 
@@ -515,8 +485,8 @@ function patdir_choosebox_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 ea_busyaction('on',handles.leadfigure,'dbs');
-
-ea_getpatients(handles);
+options.prefs=ea_prefs('');
+ea_getpatients(options,handles);
 
 ea_busyaction('off',handles.leadfigure,'dbs');
 
@@ -618,21 +588,12 @@ function doreconstruction_checkbox_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of doreconstruction_checkbox
 
-if get(hObject,'Value')
-
-
    set(handles.maskwindow_txt,'Enable','on');
-   if ~getappdata(handles.leadfigure,'macaquemodus')
        set(handles.targetpopup,'Enable','on');
-   end
 
 
 
-else
 
-   set(handles.targetpopup,'Enable','off');
-   set(handles.maskwindow_txt,'Enable','off');
-end
 ea_storeui(handles);
 
 
@@ -1113,7 +1074,10 @@ function vizspacepopup_Callback(hObject, eventdata, handles)
 %    set(handles.writeout2d_checkbox,'Enable','on');
 %    %set(handles.writeout2d_checkbox,'Value',1);
 % end
-ea_listatlassets(handles,get(handles.vizspacepopup,'Value'));
+atlasset=get(handles.atlassetpopup,'String');
+atlasset=atlasset{get(handles.atlassetpopup,'Value')};
+options.prefs=ea_prefs('');
+ea_listatlassets(options,handles,get(handles.vizspacepopup,'Value'),atlasset);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1501,3 +1465,12 @@ function checkfigures_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of checkfigures
+
+
+% --- Executes on button press in scrf.
+function scrf_Callback(hObject, eventdata, handles)
+% hObject    handle to scrf (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of scrf
